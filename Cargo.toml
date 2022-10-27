@@ -1,0 +1,12 @@
+[package]
+name = "plastimol"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rust-ini = "0.18.0"
+tokio-modbus = { version = "0.5.3", default-features = false, features = ["tcp"] }
+tokio = { version = "1.21.2", features = ["full"] }
+lorawan = "0.7.1"
