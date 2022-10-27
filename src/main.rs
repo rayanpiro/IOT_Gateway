@@ -46,6 +46,7 @@ use std::sync::{Arc, Mutex};
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
+    // let mut measure_tags: Vec<TagInfo>;
     for folder in INI_PROTOCOL_FOLDERS {
         let protocol = &folder[..folder.len()-1];
         dbg!(protocol);
@@ -56,13 +57,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let tag: TagId = TagId { 
                 id: tags[0].name.clone(),
-                handler: Arc::new(Mutex::new(Box::new(ModbusTcpDevice(data[0].clone(), tags))))
+                handler: Arc::new(
+                    Mutex::new(
+                        Box::new(
+                            ModbusTcpDevice(data[0].clone(), tags[0].clone())
+                        )
+                    )
+                )
             };
 
             dbg!(
                 tag.handler.lock()
                     .unwrap()
-                    .read(tag.clone())
+                    .read()
                     .await
             );
             

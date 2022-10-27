@@ -46,7 +46,7 @@ gen_readable_struct!(
     }
 );
 
-pub struct ModbusTcpDevice(pub ModbusTcpConnection, pub Vec<ModbusTcpTag>);
+pub struct ModbusTcpDevice(pub ModbusTcpConnection, pub ModbusTcpTag);
 
 use crate::models::device::{Device, ReadError, WriteError};
 use crate::models::tag::{TagResponse, TagValue, TagId};
@@ -71,15 +71,10 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl Device for ModbusTcpDevice {
-    async fn read(&self, tag: TagId) -> Result<TagResponse, ReadError> {
+    async fn read(&self) -> Result<TagResponse, ReadError> {
         let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
 
-        let tag_to_read = self.1.iter().filter(|&mbtag| tag.id == mbtag.name).nth(0);
-
-        let tag_to_read = match tag_to_read {
-            Some(tag) => tag,
-            None      => return Err(ReadError(format!("TagId {} not found in modbus_tcp tags.", tag.id))),
-        };
+        let tag_to_read = &self.1;
 
         let readed_data = match tag_to_read.command {
             Command::Coil       => from_coil_to_word(ctx.read_coils(tag_to_read.address, tag_to_read.length)
@@ -110,7 +105,7 @@ impl Device for ModbusTcpDevice {
         })
     }
 
-    async fn write(&self, tag: TagId, value: TagValue) -> Result<(), WriteError> {
+    async fn write(&self, value: TagValue) -> Result<(), WriteError> {
         Ok(())
     }
 }
