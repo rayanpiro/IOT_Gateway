@@ -1,23 +1,17 @@
-use crate::modbus_tcp::modbus::{
-    ModbusTcpConnectionParameters, ModbusTcpTag, ModbusTcpTagReadRequest,
-};
+use super::device::Device;
 
-pub enum TagProtocol {
-    ModbusTcpTag,
-}
-
-pub struct TagName(String);
-
+#[derive(Debug, Clone)]
 pub struct TagResponse {
-    name: TagName,
-    value: TagValue,
+    pub id: String,
+    pub value: TagValue,
 }
 
+#[derive(Debug, Clone)]
 pub enum TagValue {
-    f32,
-    u32,
-    i32,
-    String,
+    f32(f32),
+    u32(u32),
+    i32(i32),
+    String(String),
 }
 
 pub enum TagReadFrequency {
@@ -28,25 +22,9 @@ pub enum TagReadFrequency {
     Days(u32),
 }
 
-pub struct TagInfo {
-    protocol: TagProtocol,
-    name: TagName,
-}
-
-pub struct TagReadSync {
-    tag: TagInfo,
-    read_frequency: u32,
-}
-
-pub struct TagReadRequest {
-    tag: TagInfo,
-}
-
-pub struct TagEvent {
-    tag: TagInfo,
-}
-
-pub struct TagWrite {
-    tag: TagInfo,
-    value: TagValue,
+use std::sync::{Arc, Mutex};
+#[derive(Clone)]
+pub struct TagId {
+    pub id: String,
+    pub handler: Arc<Mutex<Box<dyn Device+Send>>>,
 }

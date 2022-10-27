@@ -1,9 +1,14 @@
-use crate::models::tag::{TagInfo, TagResponse, TagValue, TagWrite};
+use super::tag::{TagId, TagResponse, TagValue};
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait Device {
-    fn read(tag: TagInfo) -> Result<TagResponse, ReadError>;
-    fn write(tag: TagWrite, value: TagValue) -> Result<(), WriteError>;
+    async fn read(&self, tag: TagId) -> Result<Vec<TagResponse>, ReadError>;
+    async fn write(&self, tag: TagId, value: TagValue) -> Result<(), WriteError>;
 }
 
-pub struct WriteError(String);
-pub struct ReadError(String);
+#[derive(Debug, Clone)]
+pub struct WriteError(pub String);
+
+#[derive(Debug, Clone)]
+pub struct ReadError(pub String);

@@ -10,3 +10,5 @@ rust-ini = "0.18.0"
 tokio-modbus = { version = "0.5.3", default-features = false, features = ["tcp"] }
 tokio = { version = "1.21.2", features = ["full"] }
 lorawan = "0.7.1"
+tokio-cron-scheduler = "0.8.1"
+async-trait = "0.1.58"

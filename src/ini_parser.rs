@@ -65,7 +65,7 @@ macro_rules! gen_matcher {
 macro_rules! gen_readable_struct {
     (struct $s_name:ident { $( $field:ident:$type:ty),*, }) => {
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub struct $s_name {
             pub $( $field: $type ),*
         }
