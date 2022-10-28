@@ -46,23 +46,26 @@ gen_readable_struct!(
     }
 );
 
-pub struct ModbusTcpDevice(pub ModbusTcpConnection, pub ModbusTcpTag);
+
+pub struct ModbusTcpDevice(pub ModbusTcpConnection);
 
 use crate::models::device::{Device, ReadError, WriteError};
-use crate::models::tag::{TagResponse, TagValue, TagId};
+use crate::models::tag::{TagResponse, TagValue, TagId, Tag};
+
+impl Tag for ModbusTcpTag {}
 
 #[derive(Debug, Clone)]
-struct ModbusError(String);
+struct ModbusTcpError(String);
 
 use std::net::SocketAddr;
 
 impl ModbusTcpDevice {
-    async fn connect(&self) -> Result<Context, ModbusError> {
+    async fn connect(&self) -> Result<Context, ModbusTcpError> {
         let socket_address = SocketAddr::new(self.0.ip, self.0.port);
 
         match client::tcp::connect_slave(socket_address, Slave(self.0.slave)).await {
             Ok(ctx) => Ok(ctx),
-            Err(err) => Err(ModbusError(err.to_string())),
+            Err(err) => Err(ModbusTcpError(err.to_string())),
         } 
     }
 }
@@ -71,10 +74,11 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl Device for ModbusTcpDevice {
-    async fn read(&self) -> Result<TagResponse, ReadError> {
+    type TagType=ModbusTcpTag;
+    async fn read(&self, tag: &Self::TagType) -> Result<TagResponse, ReadError> {
         let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
 
-        let tag_to_read = &self.1;
+        let tag_to_read = tag;
 
         let readed_data = match tag_to_read.command {
             Command::Coil       => from_coil_to_word(ctx.read_coils(tag_to_read.address, tag_to_read.length)
@@ -105,7 +109,7 @@ impl Device for ModbusTcpDevice {
         })
     }
 
-    async fn write(&self, value: TagValue) -> Result<(), WriteError> {
+    async fn write(&self, tag: &Self::TagType, value: TagValue) -> Result<(), WriteError> {
         Ok(())
     }
 }
@@ -152,120 +156,3 @@ fn swap_words(words: Vec<u16>) -> Vec<u16> {
 fn swap_bytes(word: &u16) -> u16 {
     word.rotate_left(8)
 }
-
-
-// pub struct ModbusConnection(Context);
-
-// #[derive(Debug)]
-// pub struct ModbusError(String);
-// impl std::error::Error for ModbusError {}
-// impl std::fmt::Display for ModbusError {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(
-//             f,
-//             "The following error has ocurred during modbus communication: {}",
-//             self.0
-//         )
-//     }
-// }
-
-// pub async fn modbus_connect(
-//     connection_data: &ModbusTcpConnectionParameters,
-// ) -> Result<ModbusConnection, ModbusError> {
-//     let socket_address = format!("{}:{}", connection_data.ip_address, connection_data.port)
-//         .parse()
-//         .expect(
-//             format!(
-//                 "The ip {} or the port {} read from config file cannot be parsed as valid address.",
-//                 connection_data.ip_address, connection_data.port
-//             )
-//             .as_str(),
-//         );
-
-//     match client::tcp::connect_slave(socket_address, Slave(connection_data.slave)).await {
-//         Ok(ctx) => Ok(ModbusConnection(ctx)),
-//         Err(err) => Err(ModbusError(err.to_string())),
-//     }
-// }
-
-// fn parse_bool(data: Vec<bool>) -> String {
-//     let data = data.first().unwrap();
-
-//     match &data {
-//         true => "True".to_string(),
-//         false => "False".to_string(),
-//     }
-// }
-
-// fn swap_bytes(word: &u16) -> u16 {
-//     word.rotate_left(8)
-// }
-
-// fn swap_words(words: Vec<u16>) -> Vec<u16> {
-//     let mut data = words.clone();
-//     data.swap(0, 1);
-//     data.to_vec()
-// }
-
-// fn parse_for_type(data: Vec<u16>, data_type: Type, swap: Swap) -> String {
-//     let data: Vec<u16> = match swap {
-//         Swap::LittleEndian => data.iter().map(|w| swap_bytes(w)).rev().collect(),
-//         Swap::BigEndian => data,
-//         Swap::LittleEndianSwap => swap_words(data.iter().map(|w| swap_bytes(w)).rev().collect()),
-//         Swap::BigEndianSwap => swap_words(data),
-//     };
-
-//     match data_type {
-//         Type::Integer => data
-//             .iter()
-//             .fold(0u32, |acc, &num| acc << 16 | num as u32)
-//             .to_string(),
-//         Type::Float => {
-//             let num = data.iter().fold(0u32, |acc, &num| acc << 16 | num as u32);
-//             format!("{:.2}", f32::from_bits(num))
-//         }
-//     }
-// }
-
-// impl ModbusConnection {
-//     pub async fn modbus_read(
-//         &mut self,
-//         tag: ModbusTcpTagReadRequest,
-//     ) -> Result<ModbusTcpTagResponse, ModbusError> {
-//         match self.get_data(tag).await {
-//             Ok(data) => Ok(data),
-//             Err(err) => Err(ModbusError(err.to_string())),
-//         }
-//     }
-
-//     async fn get_data(
-//         &mut self,
-//         tag: ModbusTcpTagReadRequest,
-//     ) -> Result<ModbusTcpTagResponse, Box<dyn std::error::Error>> {
-//         let ctx = &mut self.0;
-//         let add = tag.address;
-//         let length = tag.length;
-//         let data_type = tag.data_type;
-//         let swap = tag.swap;
-
-//         let result = match tag.command {
-//             Command::ReadCoil => parse_bool(ctx.read_coils(add, 1).await?),
-//             Command::ReadDiscrete => parse_bool(ctx.read_discrete_inputs(add, 1).await?),
-//             Command::ReadHolding => parse_for_type(
-//                 ctx.read_holding_registers(add, length).await?,
-//                 data_type,
-//                 swap,
-//             ),
-//             Command::ReadInput => parse_for_type(
-//                 ctx.read_input_registers(add, length).await?,
-//                 data_type,
-//                 swap,
-//             ),
-//         };
-
-//         Ok(ModbusTcpTagResponse {
-//             name: tag.name,
-//             value: result,
-//         })
-//     }
-// }

@@ -1,4 +1,5 @@
 mod modbus_tcp;
+mod modbus_rtu;
 mod models;
 mod ini_parser;
 use models::device::Device;
@@ -45,7 +46,7 @@ use models::tag::TagId;
 use std::sync::{Arc, Mutex};
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
+    let mut tags: Vec<TagId<ModbusTcpDevice>>;
     // let mut measure_tags: Vec<TagInfo>;
     for folder in INI_PROTOCOL_FOLDERS {
         let protocol = &folder[..folder.len()-1];
@@ -53,25 +54,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for device in fs::read_dir(folder).unwrap() {
             let path = device.unwrap().path().to_str().unwrap().to_string();
             let data = ini_parser::read_file::<ModbusTcpConnection>(&(path.clone()+"/connection.ini"));
-            let tags = ini_parser::read_file::<ModbusTcpTag>(&(path+"/publishers.ini"));
-            
-            let tag: TagId = TagId { 
-                id: tags[0].name.clone(),
-                handler: Arc::new(
-                    Mutex::new(
-                        Box::new(
-                            ModbusTcpDevice(data[0].clone(), tags[0].clone())
-                        )
-                    )
-                )
-            };
+            tags = ini_parser::read_file::<ModbusTcpTag>(&(path+"/publishers.ini"))
+                .iter()
+                .map(|t| {
+                    TagId {
+                        tag: t.clone(),
+                        handler: ModbusTcpDevice(data[0].clone()),
+                    }
+                })
+                .collect();
 
-            dbg!(
-                tag.handler.lock()
-                    .unwrap()
-                    .read()
-                    .await
-            );
+            for t in tags {
+                dbg!(t.read().await);
+            }
             
         }
     }

@@ -1,4 +1,6 @@
-use super::device::Device;
+use super::device::{Device, ReadError};
+
+pub trait Tag {}
 
 #[derive(Debug, Clone)]
 pub struct TagResponse {
@@ -23,8 +25,15 @@ pub enum TagReadFrequency {
 }
 
 use std::sync::{Arc, Mutex};
-#[derive(Clone)]
-pub struct TagId {
-    pub id: String,
-    pub handler: Arc<Mutex<Box<dyn Device+Send>>>,
+
+pub struct TagId<T: Device> {
+    pub tag: <T as Device>::TagType,
+    pub handler: T,
+}
+
+impl<T: Device> TagId<T> {
+    pub async fn read(&self) -> Result<TagResponse, ReadError> {
+        let tag = &self.tag;
+        self.handler.read(tag).await
+    }
 }
