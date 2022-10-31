@@ -1,6 +1,7 @@
-use super::device::{Device, ReadError};
+use std::marker::PhantomData;
 
-pub trait Tag {}
+use super::device::{ReadError, THardDevice};
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct TagResponse {
@@ -10,30 +11,34 @@ pub struct TagResponse {
 
 #[derive(Debug, Clone)]
 pub enum TagValue {
-    f32(f32),
-    u32(u32),
-    i32(i32),
-    String(String),
+    F32(f32),
+    // U32(u32),
+    I32(i32),
+    // String(String),
 }
 
-pub enum TagReadFrequency {
-    Miliseconds(u32),
-    Seconds(u32),
-    Minutes(u32),
-    Hours(u32),
-    Days(u32),
+// pub enum TagReadFrequency {
+//     Miliseconds(u32),
+//     Seconds(u32),
+//     Minutes(u32),
+//     Hours(u32),
+// }
+
+#[async_trait]
+pub trait TTag {
+    async fn read(&self) -> Result<TagResponse, ReadError>;
 }
 
-use std::sync::{Arc, Mutex};
-
-pub struct TagId<T: Device> {
-    pub tag: <T as Device>::TagType,
+#[derive(Debug, Clone)]
+pub struct TagId<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: Send + Sync> {
     pub handler: T,
+    pub tag: S,
+    pub _phantom: PhantomData<C>,
 }
 
-impl<T: Device> TagId<T> {
-    pub async fn read(&self) -> Result<TagResponse, ReadError> {
-        let tag = &self.tag;
-        self.handler.read(tag).await
+#[async_trait]
+impl<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: Send + Sync> TTag for TagId<T, C, S> {
+    async fn read(&self) -> Result<TagResponse, ReadError> {
+        self.handler.read(&self.tag).await
     }
 }

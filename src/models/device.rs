@@ -1,11 +1,12 @@
-use super::tag::{TagId, TagResponse, TagValue, Tag};
+use super::tag::{TagResponse, TagValue};
 use async_trait::async_trait;
+use std::fmt::Debug;
 
 #[async_trait]
-pub trait Device {
-    type TagType: Tag;
-    async fn read(&self, tag: &Self::TagType) -> Result<TagResponse, ReadError>;
-    async fn write(&self, tag: &Self::TagType, value: TagValue) -> Result<(), WriteError>;
+pub trait THardDevice<C, T> {
+    fn new(connection: C) -> Self;
+    async fn read(&self, tag: &T) -> Result<TagResponse, ReadError>;
+    async fn write(&self, tag: &T, value: TagValue) -> Result<(), WriteError>;
 }
 
 #[derive(Debug, Clone)]

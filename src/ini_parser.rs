@@ -1,36 +1,40 @@
+use ini::Ini;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use ini::Ini;
 
 fn parse_section(fhandler: &Ini, section: Option<&str>) -> Result<HashMap<String, String>, String> {
     let section_name = section.expect("Error while parsing a section name.");
-    let section_params = fhandler.section(section).ok_or(format!("Error reading section {}.", section_name))?;
+    let section_params = fhandler
+        .section(section)
+        .ok_or(format!("Error reading section {}.", section_name))?;
     let mut section_data = HashMap::new();
-    
+
     // Insert the section name as the name parameter in the hashmap
     section_data.insert("name".to_string(), section_name.to_string());
-    
+
     // Insert each parameter and value in the hashmap
-    section_params.iter()
-        .for_each(|(param_name, param_value)| {
-            section_data.insert(param_name.to_string(), param_value.to_string());
-        });
+    section_params.iter().for_each(|(param_name, param_value)| {
+        section_data.insert(param_name.to_string(), param_value.to_string());
+    });
     Ok(section_data)
 }
 
 pub fn read_file<T>(filename: &str) -> Vec<T>
-where T: TryFrom<HashMap<String, String>>, <T as TryFrom<HashMap<String, String>>>::Error: Debug {
+where
+    T: TryFrom<HashMap<String, String>>,
+    <T as TryFrom<HashMap<String, String>>>::Error: Debug,
+{
     let mut vec = Vec::new();
-    let fhandler = ini::Ini::load_from_file(filename).expect(&format!("Error opening or parsing file {}.", filename));
+    let fhandler = ini::Ini::load_from_file(filename)
+        .expect(&format!("Error opening or parsing file {}.", filename));
 
     // Iterate in every section to get the needed
     fhandler.sections().for_each(|section| {
-
         let data = parse_section(&fhandler, section)
             .expect(&format!("Error while parsing file {}.", filename));
-        
-        let parsed_data = T::try_from(data)
-            .expect(&format!("Error while parsing file {}.", filename));
+
+        let parsed_data =
+            T::try_from(data).expect(&format!("Error while parsing file {}.", filename));
         vec.push(parsed_data);
     });
     vec
@@ -80,7 +84,7 @@ macro_rules! gen_readable_struct {
                     let $field = match value.get(stringify!($field)) {
                         None        => return Err(field_error(stringify!($field))),
                         Some(value) => match value.parse() {
-                            Err(err)      => return Err(parse_error(stringify!($field), value)),
+                            Err(_)      => return Err(parse_error(stringify!($field), value)),
                             Ok(parsed)  => parsed,
                         }
                     };

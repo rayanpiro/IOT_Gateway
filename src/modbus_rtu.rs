@@ -33,7 +33,6 @@ gen_readable_struct!(
         name: String,
         tty_path: String,
         baudrate: u32,
-        port: u16,
         slave: u8,
     }
 );
@@ -49,88 +48,92 @@ gen_readable_struct!(
     }
 );
 
-
+#[derive(Debug, Clone)]
 pub struct ModbusRtuDevice(pub ModbusRtuConnection);
 
-use crate::models::device::{Device, ReadError, WriteError};
-use crate::models::tag::{TagResponse, TagValue, TagId, Tag};
-
-impl Tag for ModbusRtuTag {}
+use crate::models::device::{ReadError, THardDevice, WriteError};
+use crate::models::tag::{TagResponse, TagValue};
 
 #[derive(Debug, Clone)]
 struct ModbusRtuError(String);
 
-use std::net::SocketAddr;
-
 impl ModbusRtuDevice {
     async fn connect(&self) -> Result<Context, ModbusRtuError> {
-
         let serial_address = tokio_serial::new(&self.0.tty_path, self.0.baudrate);
         let serial_stream = tokio_serial::SerialStream::open(&serial_address)
-            .map_err(|err|ModbusRtuError(err.to_string()))?;
+            .map_err(|err| ModbusRtuError(err.to_string()))?;
 
         match rtu::connect_slave(serial_stream, Slave(self.0.slave)).await {
             Ok(ctx) => Ok(ctx),
             Err(err) => Err(ModbusRtuError(err.to_string())),
-        } 
+        }
     }
 }
 
 use async_trait::async_trait;
 
 #[async_trait]
-impl Device for ModbusRtuDevice {
-    type TagType=ModbusRtuTag;
-    async fn read(&self, tag: &Self::TagType) -> Result<TagResponse, ReadError> {
+impl THardDevice<ModbusRtuConnection, ModbusRtuTag> for ModbusRtuDevice {
+    fn new(connection: ModbusRtuConnection) -> Self {
+        ModbusRtuDevice(connection)
+    }
+
+    async fn read(&self, tag: &ModbusRtuTag) -> Result<TagResponse, ReadError> {
         let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
 
         let tag_to_read = tag;
 
         let readed_data = match tag_to_read.command {
-            Command::Coil       => from_coil_to_word(ctx.read_coils(tag_to_read.address, tag_to_read.length)
-                .await
-                .map_err(|err| ReadError(err.to_string()))),
-            Command::Discrete   => from_coil_to_word(ctx.read_discrete_inputs(tag_to_read.address, tag_to_read.length)
-                .await
-                .map_err(|err| ReadError(err.to_string()))),
-            Command::Holding    => ctx.read_holding_registers(tag_to_read.address, tag_to_read.length)
+            Command::Coil => from_coil_to_word(
+                ctx.read_coils(tag_to_read.address, tag_to_read.length)
+                    .await
+                    .map_err(|err| ReadError(err.to_string())),
+            ),
+            Command::Discrete => from_coil_to_word(
+                ctx.read_discrete_inputs(tag_to_read.address, tag_to_read.length)
+                    .await
+                    .map_err(|err| ReadError(err.to_string())),
+            ),
+            Command::Holding => ctx
+                .read_holding_registers(tag_to_read.address, tag_to_read.length)
                 .await
                 .map_err(|err| ReadError(err.to_string())),
-            Command::Input      => ctx.read_input_registers(tag_to_read.address, tag_to_read.length)
+            Command::Input => ctx
+                .read_input_registers(tag_to_read.address, tag_to_read.length)
                 .await
                 .map_err(|err| ReadError(err.to_string())),
         }?;
 
-        let parsed_data = parse_for_type(readed_data, tag_to_read.data_type.clone(), tag_to_read.swap.clone());
+        let parsed_data = parse_for_type(
+            readed_data,
+            tag_to_read.data_type.clone(),
+            tag_to_read.swap.clone(),
+        );
 
         let value = match tag_to_read.data_type {
-            Type::Integer => TagValue::i32(parsed_data.parse().unwrap()),
-            Type::Float   => TagValue::f32(parsed_data.parse().unwrap()),
+            Type::Integer => TagValue::I32(parsed_data.parse().unwrap()),
+            Type::Float => TagValue::F32(parsed_data.parse().unwrap()),
         };
 
-        Ok(TagResponse
-        {
+        Ok(TagResponse {
             id: tag_to_read.name.clone(),
             value,
         })
     }
 
-    async fn write(&self, tag: &Self::TagType, value: TagValue) -> Result<(), WriteError> {
+    async fn write(&self, _tag: &ModbusRtuTag, _value: TagValue) -> Result<(), WriteError> {
         Ok(())
     }
 }
 
 fn from_coil_to_word(data: Result<Vec<bool>, ReadError>) -> Result<Vec<u16>, ReadError> {
-    Ok(
-        data?.iter()
-            .map(|b| {
-                match b {
-                    true    => 1,
-                    false   => 0,
-                }
-            })
-            .collect()
-    )
+    Ok(data?
+        .iter()
+        .map(|b| match b {
+            true => 1,
+            false => 0,
+        })
+        .collect())
 }
 
 fn parse_for_type(data: Vec<u16>, data_type: Type, swap: Swap) -> String {
