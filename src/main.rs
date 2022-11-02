@@ -46,6 +46,8 @@ where
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut tags: Vec<Box<dyn TTag>> = Vec::new();
 
+    
+
     for folder in INI_PROTOCOL_FOLDERS {
         let protocol = &folder[..folder.len() - 1];
 

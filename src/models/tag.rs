@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::device::{ReadError, THardDevice};
+use super::device::{ReadError, WriteError, THardDevice};
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
@@ -27,6 +27,7 @@ pub enum TagValue {
 #[async_trait]
 pub trait TTag {
     async fn read(&self) -> Result<TagResponse, ReadError>;
+    async fn write(&self, value: TagValue) -> Result<(), WriteError>;
 }
 
 #[derive(Debug, Clone)]
@@ -40,5 +41,9 @@ pub struct TagId<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: Send + S
 impl<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: Send + Sync> TTag for TagId<T, C, S> {
     async fn read(&self) -> Result<TagResponse, ReadError> {
         self.handler.read(&self.tag).await
+    }
+
+    async fn write(&self, value: TagValue) -> Result<(), WriteError> {
+        self.handler.write(&self.tag, value).await
     }
 }
