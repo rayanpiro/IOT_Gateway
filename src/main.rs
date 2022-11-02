@@ -75,6 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|t| t.read().then(|f| async { dbg!(f.unwrap()) }));
 
         use futures::future::join_all;
-        let _ = join_all(h1).await;   
+        let _ = join_all(h1).await;
+        let _ = tokio::time::sleep(tokio::time::Duration::new(2, 0)).await;
     }
 }
