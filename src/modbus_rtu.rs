@@ -45,6 +45,7 @@ gen_readable_struct!(
         command: Command,
         swap: Swap,
         data_type: Type,
+        read_freq: u32,
     }
 );
 
