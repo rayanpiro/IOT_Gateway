@@ -45,15 +45,24 @@ gen_readable_struct!(
         command: Command,
         swap: Swap,
         data_type: Type,
-        read_freq: u32,
+        read_freq: TagReadFrequency,
     }
 );
+
+impl TValidTag for ModbusRtuTag {
+    fn get_name(&self) -> &str{
+        &self.name
+    }
+    fn get_freq(&self) -> &TagReadFrequency {
+        &self.read_freq
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ModbusRtuDevice(pub ModbusRtuConnection);
 
 use crate::models::device::{ReadError, THardDevice, WriteError};
-use crate::models::tag::{TagResponse, TagValue};
+use crate::models::tag::{TagResponse, TagValue, TagReadFrequency, TValidTag};
 
 #[derive(Debug, Clone)]
 struct ModbusRtuError(String);

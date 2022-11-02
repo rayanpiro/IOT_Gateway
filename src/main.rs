@@ -2,6 +2,7 @@ mod ini_parser;
 mod modbus_rtu;
 mod modbus_tcp;
 mod models;
+use futures::future::{self, join_all};
 use tokio;
 
 const INI_PROTOCOL_FOLDERS: [&str; 2] = ["modbus_tcp/", "modbus_rtu/"];
@@ -10,16 +11,18 @@ use modbus_rtu::{ModbusRtuConnection, ModbusRtuDevice, ModbusRtuTag};
 use modbus_tcp::{ModbusTcpConnection, ModbusTcpDevice, ModbusTcpTag};
 use models::{
     device::THardDevice,
-    tag::{TTag, TagId},
+    tag::{TTag, TagId, TValidTag},
 };
-use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData};
+use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData, time::Duration};
+use tokio_cron_scheduler::{JobScheduler, JobToRun, Job};
 
-fn read_tags<T, C, S>(path: &str) -> Vec<Box<dyn TTag>>
+use std::sync::{Arc, Mutex};
+fn read_tags<T, C, S>(path: &str) -> Vec<Arc<dyn TTag>>
 where
     T: THardDevice<C, S> + Clone + Send + Sync + 'static,
     C: TryFrom<HashMap<String, String>> + Debug + Clone + Send + Sync + 'static,
     <C as TryFrom<HashMap<String, String>>>::Error: Debug,
-    S: TryFrom<HashMap<String, String>> + Debug + Clone + Send + Sync + 'static,
+    S: TValidTag + TryFrom<HashMap<String, String>> + Debug + Clone + Send + Sync + 'static,
     <S as TryFrom<HashMap<String, String>>>::Error: Debug,
 {
     let path = path.to_string();
@@ -32,9 +35,9 @@ where
         .into_iter()
         .map(|t| {
             let device = T::new(connection.clone());
-            let tag: Box<dyn TTag> = Box::new(TagId {
-                handler: device.clone(),
-                tag: t.clone(),
+            let tag: Arc<dyn TTag> = Arc::new(TagId {
+                handler: Arc::new(device),
+                tag: Arc::new(t),
                 _phantom: PhantomData,
             });
             tag
@@ -42,11 +45,11 @@ where
         .collect()
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut tags: Vec<Box<dyn TTag>> = Vec::new();
 
-    
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut sched = JobScheduler::new().await.unwrap();
+    let mut tags: Vec<Arc<dyn TTag>> = Vec::new();
 
     for folder in INI_PROTOCOL_FOLDERS {
         let protocol = &folder[..folder.len() - 1];
@@ -70,14 +73,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    loop {
-        use futures::FutureExt;
-        let h1 = tags
-            .iter()
-            .map(|t| t.read().then(|f| async { dbg!(f.unwrap()) }));
+    use futures::FutureExt;
+    for t in tags.iter() {
+        let t = t.clone();
+        let job = Job::new_repeated_async(Duration::from_secs(t.get_tag().get_freq().to_seconds()), move |_uuid, _l| Box::pin({
+            let t = t.clone();
+            async move {
+                dbg!(t.get_tag().get_name());
+                // t.read().then(|f| async { dbg!(f) }).await;
+            }
+        })).unwrap();
+        sched.add(job).await.unwrap();
+    };
 
-        use futures::future::join_all;
-        let _ = join_all(h1).await;
-        let _ = tokio::time::sleep(tokio::time::Duration::new(2, 0)).await;
-    }
+    let _ = sched.start().await.unwrap().await;
+
+    // loop {
+    //     use futures::FutureExt;
+    //     let h1 = tags
+    //         .iter()
+    //         .map(|t| t.read().then(|f| async { dbg!(f.unwrap()) }));
+
+    //     use futures::future::join_all;
+    //     let _ = join_all(h1).await;
+    //     let _ = tokio::time::sleep(tokio::time::Duration::new(2, 0)).await;
+    // }
+    Ok(())
 }

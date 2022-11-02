@@ -9,7 +9,7 @@ edition = "2021"
 rust-ini = "0.18.0"
 tokio-modbus = { version = "0.5.3", default-features = false, features = ["tcp", "rtu"] }
 tokio = { version = "1.21.2", features = ["full"] }
-tokio-cron-scheduler = "0.8.1"
+tokio-cron-scheduler = "*"
 async-trait = "0.1.58"
 tokio-serial = "5.4.3"
 futures = "0.3.25"
