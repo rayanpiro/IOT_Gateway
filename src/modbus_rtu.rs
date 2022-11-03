@@ -1,6 +1,4 @@
-use futures::TryFutureExt;
 use tokio_modbus::{client::Context, prelude::*};
-use tokio_serial;
 
 use crate::{gen_matcher, gen_readable_struct};
 
@@ -126,7 +124,6 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             Type::Float => TagValue::F32(parsed_data.parse().unwrap()),
         };
 
-        dbg!(tag_to_read);
         Ok(TagResponse {
             id: tag_to_read.name.clone(),
             value,
