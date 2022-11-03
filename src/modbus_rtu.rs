@@ -1,3 +1,4 @@
+use futures::TryFutureExt;
 use tokio_modbus::{client::Context, prelude::*};
 use tokio_serial;
 
@@ -29,10 +30,10 @@ gen_matcher!(
 );
 
 gen_readable_struct!(
-    struct ModbusRtuConnection {
+    struct ModbusRtuOverTCPConnection {
         name: String,
-        tty_path: String,
-        baudrate: u32,
+        ip: std::net::IpAddr,
+        port: u16,
         slave: u8,
     }
 );
@@ -59,7 +60,7 @@ impl TValidTag for ModbusRtuTag {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModbusRtuDevice(pub ModbusRtuConnection);
+pub struct ModbusRtuOverTCPDevice(pub ModbusRtuOverTCPConnection);
 
 use crate::models::device::{ReadError, THardDevice, WriteError};
 use crate::models::tag::{TagResponse, TagValue, TagReadFrequency, TValidTag};
@@ -67,13 +68,13 @@ use crate::models::tag::{TagResponse, TagValue, TagReadFrequency, TValidTag};
 #[derive(Debug, Clone)]
 struct ModbusRtuError(String);
 
-impl ModbusRtuDevice {
+impl ModbusRtuOverTCPDevice {
     async fn connect(&self) -> Result<Context, ModbusRtuError> {
-        let serial_address = tokio_serial::new(&self.0.tty_path, self.0.baudrate);
-        let serial_stream = tokio_serial::SerialStream::open(&serial_address)
+
+        let ethernet_gateway = tokio::net::TcpStream::connect((self.0.ip, self.0.port)).await
             .map_err(|err| ModbusRtuError(err.to_string()))?;
 
-        match rtu::connect_slave(serial_stream, Slave(self.0.slave)).await {
+        match rtu::connect_slave(ethernet_gateway, Slave(self.0.slave)).await {
             Ok(ctx) => Ok(ctx),
             Err(err) => Err(ModbusRtuError(err.to_string())),
         }
@@ -83,9 +84,9 @@ impl ModbusRtuDevice {
 use async_trait::async_trait;
 
 #[async_trait]
-impl THardDevice<ModbusRtuConnection, ModbusRtuTag> for ModbusRtuDevice {
-    fn new(connection: ModbusRtuConnection) -> Self {
-        ModbusRtuDevice(connection)
+impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPDevice {
+    fn new(connection: ModbusRtuOverTCPConnection) -> Self {
+        ModbusRtuOverTCPDevice(connection)
     }
 
     async fn read(&self, tag: &ModbusRtuTag) -> Result<TagResponse, ReadError> {
@@ -125,6 +126,7 @@ impl THardDevice<ModbusRtuConnection, ModbusRtuTag> for ModbusRtuDevice {
             Type::Float => TagValue::F32(parsed_data.parse().unwrap()),
         };
 
+        dbg!(tag_to_read);
         Ok(TagResponse {
             id: tag_to_read.name.clone(),
             value,

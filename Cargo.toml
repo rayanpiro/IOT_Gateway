@@ -7,9 +7,14 @@ edition = "2021"
 
 [dependencies]
 rust-ini = "0.18.0"
-tokio-modbus = { version = "0.5.3", default-features = false, features = ["tcp", "rtu"] }
+tokio-modbus = { version = "0.5.3", default-features = false, features = ["tcp", "rtu", "sync"] }
 tokio = { version = "1.21.2", features = ["full"] }
 tokio-cron-scheduler = "*"
 async-trait = "0.1.58"
 tokio-serial = "5.4.3"
 futures = "0.3.25"
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1
+strip = true
