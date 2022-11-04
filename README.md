@@ -49,7 +49,7 @@ Ejemplo de publishers.ini para protocolo modbus tcp.
 
 # Estructura MQTT.
 
-    /client_id/warehouse_id/machine_id/
+    /client_id/warehouse_id/device_id/
                                       /measures/{tag_name}  -> Publicación de las medidas sin petición.
                                       /events/{tag_name}    -> Publicación de cambios de estado sin petición.
                                       /commands/{tag_name}  -> Envio de comandos de escritura, peticion de lectura, PING request.
