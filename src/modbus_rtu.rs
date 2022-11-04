@@ -45,6 +45,7 @@ gen_readable_struct!(
         swap: Swap,
         data_type: Type,
         read_freq: TagReadFrequency,
+        multiplier: f32,
     }
 );
 
@@ -118,9 +119,12 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             tag_to_read.swap.clone(),
         );
 
-        let value = match tag_to_read.data_type {
-            Type::Integer => TagValue::I32(parsed_data.parse().unwrap()),
-            Type::Float => TagValue::F32(parsed_data.parse().unwrap()),
+        let readed_value: f32 = parsed_data.parse().unwrap();
+        let scaled_value = readed_value*tag_to_read.multiplier;
+
+        let value = match is_integer(scaled_value) {
+            true  => TagValue::I32(scaled_value as i32),
+            false => TagValue::F32(scaled_value),
         };
 
         // Making this little sleep we block the handler during 1s
@@ -167,6 +171,10 @@ fn parse_for_type(data: Vec<u16>, data_type: Type, swap: Swap) -> String {
             format!("{:.2}", f32::from_bits(num))
         }
     }
+}
+
+fn is_integer(value: f32) -> bool {
+    value == value.round()
 }
 
 fn swap_words(words: Vec<u16>) -> Vec<u16> {
