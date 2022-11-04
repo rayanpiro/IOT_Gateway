@@ -1,2 +1,3 @@
 /target
-/modbus*
+/modbus_tcp
+/modbus_rtu
