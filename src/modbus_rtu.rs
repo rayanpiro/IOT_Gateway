@@ -89,7 +89,6 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
 
     async fn read(&self, tag: &ModbusRtuTag) -> Result<TagResponse, ReadError> {
         let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
-
         let tag_to_read = tag;
 
         let readed_data = match tag_to_read.command {
@@ -123,6 +122,8 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             Type::Integer => TagValue::I32(parsed_data.parse().unwrap()),
             Type::Float => TagValue::F32(parsed_data.parse().unwrap()),
         };
+
+        tokio::time::sleep(std::time::Duration::new(1, 0)).await;
 
         Ok(TagResponse {
             id: tag_to_read.name.clone(),

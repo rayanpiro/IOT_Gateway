@@ -64,9 +64,10 @@ pub trait TValidTag {
 }
 
 use std::sync::Arc;
+use tokio::sync::Mutex;
 #[derive(Debug, Clone)]
 pub struct TagId<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: TValidTag + Send + Sync> {
-    pub handler: Arc<T>,
+    pub handler: Arc<Mutex<T>>,
     pub tag: Arc<S>,
     pub _phantom: PhantomData<C>,
 }
@@ -74,11 +75,11 @@ pub struct TagId<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: TValidTa
 #[async_trait]
 impl<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: TValidTag + Send + Sync + 'static> TTag for TagId<T, C, S> {
     async fn read(&self) -> Result<TagResponse, ReadError> {
-        self.handler.read(&self.tag).await
+        self.handler.lock().await.read(&self.tag).await
     }
 
     async fn write(&self, value: TagValue) -> Result<(), WriteError> {
-        self.handler.write(&self.tag, value).await
+        self.handler.lock().await.write(&self.tag, value).await
     }
 
     fn get_tag(&self) -> Arc<dyn TValidTag> {
