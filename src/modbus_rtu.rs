@@ -123,6 +123,9 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             Type::Float => TagValue::F32(parsed_data.parse().unwrap()),
         };
 
+        // Making this little sleep we block the handler during 1s
+        // this time gives the cheaper devices some more time to handle
+        // the next request.
         tokio::time::sleep(std::time::Duration::new(1, 0)).await;
 
         Ok(TagResponse {
