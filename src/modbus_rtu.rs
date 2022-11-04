@@ -2,6 +2,8 @@ use tokio_modbus::{client::Context, prelude::*};
 
 use crate::{gen_matcher, gen_readable_struct};
 
+const SLEEP_SECONDS_CONVERTER_NEEDS_TO_HANDLE_NEW_REQUEST: u64 = 1;
+
 gen_matcher!(
     enum Swap {
         BigEndian,
@@ -113,6 +115,9 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
                 .map_err(|err| ReadError(err.to_string())),
         }?;
 
+        ctx.disconnect().await
+            .map_err(|err| ReadError(err.to_string()))?;
+
         let parsed_data = parse_for_type(
             readed_data,
             tag_to_read.data_type.clone(),
@@ -127,10 +132,10 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             false => TagValue::F32(scaled_value),
         };
 
-        // Making this little sleep we block the handler during 1s
+        // Making this little sleep we block the handler during X time
         // this time gives the cheaper devices some more time to handle
         // the next request.
-        tokio::time::sleep(std::time::Duration::new(1, 0)).await;
+        tokio::time::sleep(std::time::Duration::new(SLEEP_SECONDS_CONVERTER_NEEDS_TO_HANDLE_NEW_REQUEST, 0)).await;
 
         Ok(TagResponse {
             id: tag_to_read.name.clone(),

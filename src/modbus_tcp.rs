@@ -113,6 +113,9 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
                 .map_err(|err| ReadError(err.to_string())),
         }?;
 
+        ctx.disconnect().await
+            .map_err(|err| ReadError(err.to_string()))?;
+
         let parsed_data = parse_for_type(
             readed_data,
             tag_to_read.data_type.clone(),
