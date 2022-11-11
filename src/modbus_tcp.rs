@@ -136,7 +136,48 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
         })
     }
 
-    async fn write(&self, _tag: &ModbusTcpTag, _value: TagValue) -> Result<(), WriteError> {
+    async fn write(&self, tag: &ModbusTcpTag, value: TagValue) -> Result<(), WriteError> {
+        let mut ctx = self.connect().await.map_err(|err| WriteError(err.0))?;
+        let tag_to_write = tag;
+
+        let value_to_write = match value {
+            TagValue::F32(x) => {
+                let scaled_value: f32 = x;
+                scaled_value.to_be_bytes()
+            },
+            TagValue::I32(x) => {
+                let scaled_value = x;
+                scaled_value.to_be_bytes()
+            },
+        };
+
+        dbg!(value_to_write);
+
+        match tag_to_write.command {
+            Command::Coil => ctx.write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0)
+                    .await
+                    .map_err(|err| WriteError(err.to_string()),
+            ),
+            Command::Discrete => unimplemented!("A discrete register cannot be writted."),
+            Command::Holding => {
+                let value: Vec<u16> = value_to_write.windows(2)
+                    .map(|pair| {
+                        let word: [u8; 2] = [pair[0].clone(), pair[1].clone()];
+                        u16::from_be_bytes(word)
+                    })
+                    .collect();
+                    
+                ctx
+                    .write_multiple_registers(tag_to_write.address, &value)
+                    .await
+                    .map_err(|err| WriteError(err.to_string()))
+            },
+            Command::Input => unimplemented!("A discrete register cannot be writted."),
+        }?;
+
+        ctx.disconnect().await
+            .map_err(|err| WriteError(err.to_string()))?;
+        
         Ok(())
     }
 }

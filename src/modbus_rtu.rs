@@ -34,13 +34,13 @@ gen_readable_struct!(
         name: String,
         ip: std::net::IpAddr,
         port: u16,
-        slave: u8,
     }
 );
 
 gen_readable_struct!(
     struct ModbusRtuTag {
         name: String,
+        slave: u8,
         address: u16,
         length: u16,
         command: Command,
@@ -70,12 +70,12 @@ use crate::models::tag::{TagResponse, TagValue, TagReadFrequency, TValidTag};
 struct ModbusRtuError(String);
 
 impl ModbusRtuOverTCPDevice {
-    async fn connect(&self) -> Result<Context, ModbusRtuError> {
+    async fn connect(&self, slave: Slave) -> Result<Context, ModbusRtuError> {
 
         let ethernet_gateway = tokio::net::TcpStream::connect((self.0.ip, self.0.port)).await
             .map_err(|err| ModbusRtuError(err.to_string()))?;
 
-        match rtu::connect_slave(ethernet_gateway, Slave(self.0.slave)).await {
+        match rtu::connect_slave(ethernet_gateway, slave).await {
             Ok(ctx) => Ok(ctx),
             Err(err) => Err(ModbusRtuError(err.to_string())),
         }
@@ -91,7 +91,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
     }
 
     async fn read(&self, tag: &ModbusRtuTag) -> Result<TagResponse, ReadError> {
-        let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
+        let mut ctx = self.connect(Slave(tag.slave)).await.map_err(|err| ReadError(err.0))?;
         let tag_to_read = tag;
 
         let readed_data = match tag_to_read.command {
@@ -143,7 +143,53 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
         })
     }
 
-    async fn write(&self, _tag: &ModbusRtuTag, _value: TagValue) -> Result<(), WriteError> {
+    async fn write(&self, tag: &ModbusRtuTag, value: TagValue) -> Result<(), WriteError> {
+        let mut ctx = self.connect(Slave(tag.slave)).await.map_err(|err| WriteError(err.0))?;
+        let tag_to_write = tag;
+
+        let value_to_write = match value {
+            TagValue::F32(x) => {
+                let scaled_value: f32 = x/tag_to_write.multiplier;
+                scaled_value.to_be_bytes()
+            },
+            TagValue::I32(x) => {
+                let scaled_value: f32 = (x as f32)/tag_to_write.multiplier;
+                scaled_value.to_be_bytes()
+            },
+        };
+
+        dbg!(value_to_write);
+
+        match tag_to_write.command {
+            Command::Coil => ctx.write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0)
+                    .await
+                    .map_err(|err| WriteError(err.to_string()),
+            ),
+            Command::Discrete => unimplemented!("A discrete register cannot be writted."),
+            Command::Holding => {
+                let value: Vec<u16> = value_to_write.windows(2)
+                    .map(|pair| {
+                        let word: [u8; 2] = [pair[0].clone(), pair[1].clone()];
+                        u16::from_be_bytes(word)
+                    })
+                    .collect();
+                    
+                ctx
+                    .write_multiple_registers(tag_to_write.address, &value)
+                    .await
+                    .map_err(|err| WriteError(err.to_string()))
+            },
+            Command::Input => unimplemented!("A discrete register cannot be writted."),
+        }?;
+
+        ctx.disconnect().await
+            .map_err(|err| WriteError(err.to_string()))?;
+
+        // Making this little sleep we block the handler during X time
+        // this time gives the cheaper devices some more time to handle
+        // the next request.
+        tokio::time::sleep(std::time::Duration::new(SLEEP_SECONDS_CONVERTER_NEEDS_TO_HANDLE_NEW_REQUEST, 0)).await;
+
         Ok(())
     }
 }
