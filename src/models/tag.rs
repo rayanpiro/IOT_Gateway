@@ -17,6 +17,15 @@ pub enum TagValue {
     // String(String),
 }
 
+impl ToString for TagValue {
+    fn to_string(&self) -> String {
+        match self {
+            Self::I32(x) => x.to_string(),
+            Self::F32(x) => x.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum TagReadFrequency {
     Seconds(u64),
