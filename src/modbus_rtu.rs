@@ -116,7 +116,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             .await
             .map_err(|err| ReadError(err.to_string()))?;
 
-        let parsed_data = parse_for_type(
+        let parsed_data = parse_readed(
             readed_data,
             &tag,
         );
@@ -210,7 +210,7 @@ fn from_coil_to_word<'a>(
     })
 }
 
-fn parse_for_type(data: Vec<u16>, tag: &ModbusRtuTag) -> TagValue {
+fn parse_readed(data: Vec<u16>, tag: &ModbusRtuTag) -> TagValue {
     let data: Vec<u16> = match tag.swap {
         Swap::LittleEndian => data.iter().map(|w| swap_bytes(w)).rev().collect(),
         Swap::BigEndian => data,
