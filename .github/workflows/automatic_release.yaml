@@ -39,7 +39,7 @@ jobs:
 
     strategy:
       matrix:
-        build: [stable, beta, nightly]
+        build: [stable]
         include:
           - build: beta
             rust: beta
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy: 
       matrix:
-        target: [ aarch64-unknown-linux-gnu, armv7-unknown-linux-gnueabihf, i686-unknown-linux-gnu, i686-unknown-linux-musl, mips-unknown-linux-gnu, mips64-unknown-linux-gnuabi64, mips64el-unknown-linux-gnuabi64, mipsel-unknown-linux-gnu, powerpc-unknown-linux-gnu, powerpc64-unknown-linux-gnu, powerpc64le-unknown-linux-gnu,           arm-unknown-linux-gnueabi          ,x86_64-unknown-linux-gnu           ,x86_64-unknown-linux-musl]
+        target: [ mips-unknown-linux-musl ]
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -105,14 +105,14 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          #strip target/${{ matrix.target }}/release/testmest
+          #strip target/${{ matrix.target }}/release/iot_gateway
           cd target/${{ matrix.target }}/release          
-          tar czvf ../../../testmest-${{ matrix.target }}.tar.gz testmest
+          tar czvf ../../../iot_gateway-${{ matrix.target }}.tar.gz iot_gateway
           cd -
       - name: Publish
         uses: softprops/action-gh-release@v1
         # TODO: if any of the build step fails, the release should be deleted.
         with:
-            files: 'testmest*'
+            files: 'iot_gateway'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
