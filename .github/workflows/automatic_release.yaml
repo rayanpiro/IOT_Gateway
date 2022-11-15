@@ -60,7 +60,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          #strip target/${{ matrix.target }}/release/iot_gateway
+          strip target/${{ matrix.target }}/release/iot_gateway
           cd target/${{ matrix.target }}/release          
           tar czvf ../../../iot_gateway-${{ matrix.target }}.tar.gz iot_gateway
           cd -
