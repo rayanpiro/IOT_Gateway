@@ -10,12 +10,12 @@ use modbus_rtu::{ModbusRtuOverTCPConnection, ModbusRtuOverTCPDevice, ModbusRtuTa
 use modbus_tcp::{ModbusTcpConnection, ModbusTcpDevice, ModbusTcpTag};
 use models::{
     device::THardDevice,
-    tag::{TTag, TagId, TValidTag},
+    tag::{TTag, TValidTag, TagId},
 };
 use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData, time::Duration};
-use tokio_cron_scheduler::{JobScheduler, Job};
+use tokio_cron_scheduler::{Job, JobScheduler};
 
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 fn read_tags<T, C, S>(path: &str) -> Vec<Arc<dyn TTag>>
 where
@@ -30,7 +30,7 @@ where
         .into_iter()
         .nth(0)
         .unwrap();
-    
+
     let mutex_device = Arc::new(Mutex::new(T::new(connection)));
 
     ini_parser::read_file::<S>(&(format!("{}/publishers.ini", &path)))
@@ -46,7 +46,7 @@ where
         .collect()
 }
 
-fn from_ini() -> Vec<Arc<dyn  TTag>> {
+fn from_ini() -> Vec<Arc<dyn TTag>> {
     let mut tags: Vec<Arc<dyn TTag>> = Vec::new();
 
     for folder in INI_PROTOCOL_FOLDERS {
@@ -80,35 +80,44 @@ async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
     for t in tags.iter() {
         let seconds = t.get_tag().get_freq().to_seconds();
         let t = t.clone();
-        let job = Job::new_repeated_async(Duration::from_secs(seconds), move |_uuid, _l| Box::pin({
-            let t = t.clone();
-            async move {
-                dbg!(t.get_tag().get_name());
-                while let Err(_) = dbg!(t.read().await) {
-                    println!("Trying to read again tag {}!", t.get_tag().get_name());
+        let job = Job::new_repeated_async(Duration::from_secs(seconds), move |_uuid, _l| {
+            Box::pin({
+                let t = t.clone();
+                async move {
+                    dbg!(t.get_tag().get_name());
+                    if let Err(_) = dbg!(t.read().await) {
+                        println!("Trying to read again tag {}!", t.get_tag().get_name());
+                    }
                 }
-            }
-        })).unwrap();
+            })
+        })
+        .unwrap();
         sched.add(job).await.unwrap();
-    };
+    }
 
     dbg!(sched.start().await.unwrap().await);
 }
 
 async fn one_shot_read(tags: Vec<Arc<dyn TTag>>, tag_to_read: &str) {
-    let filtered_tags = tags.iter()
+    const ERROR_MSG: &'static str = "Error";
+
+    let filtered_tags = tags
+        .iter()
         .filter(|t| t.get_tag().get_name() == tag_to_read);
-        
+
+    if filtered_tags.clone().count() == 0 {
+        print!("{}", ERROR_MSG);
+    }
+
     for t in filtered_tags {
         let t = t.clone();
         let res = t.read().await;
         match res {
             Ok(x) => print!("{}", x.value.to_string()),
-            Err(_) => print!("Error"),
+            Err(_) => print!("{}", ERROR_MSG),
         };
     }
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -117,10 +126,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 {
         one_shot_read(tags, args.get(1).unwrap()).await;
-    }
-    else {
+    } else {
         daemon_mode(tags).await;
     }
-    
+
     Ok(())
 }
