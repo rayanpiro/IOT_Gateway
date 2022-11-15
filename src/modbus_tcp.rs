@@ -88,16 +88,13 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
     }
 
     async fn read(&self, tag: &ModbusTcpTag) -> Result<TagResponse, ReadError> {
-        let mut ctx = self
-            .connect()
-            .await
-            .map_err(|err| ReadError(err.0))?;
+        let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
 
         let readed_data = match tag.command {
-            Command::Coil =>
-                from_coil_to_word(ctx.read_coils(tag.address, tag.length)),
-            Command::Discrete =>
-                from_coil_to_word(ctx.read_discrete_inputs(tag.address, tag.length)),
+            Command::Coil => from_coil_to_word(ctx.read_coils(tag.address, tag.length)),
+            Command::Discrete => {
+                from_coil_to_word(ctx.read_discrete_inputs(tag.address, tag.length))
+            }
             Command::Holding => ctx.read_holding_registers(tag.address, tag.length),
             Command::Input => ctx.read_input_registers(tag.address, tag.length),
         };
@@ -110,10 +107,7 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
             .await
             .map_err(|err| ReadError(err.to_string()))?;
 
-        let parsed_data = parse_readed(
-            readed_data,
-            &tag,
-        );
+        let parsed_data = parse_readed(readed_data, &tag);
 
         Ok(TagResponse {
             id: tag.name.clone(),
@@ -139,8 +133,10 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
         dbg!(value_to_write);
 
         match tag_to_write.command {
-            Command::Coil => ctx
-                .write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0).await,
+            Command::Coil => {
+                ctx.write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0)
+                    .await
+            }
             Command::Discrete => unimplemented!("A discrete register cannot be written."),
             Command::Holding => {
                 let value: Vec<u16> = value_to_write
@@ -151,10 +147,12 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
                     })
                     .collect();
 
-                ctx.write_multiple_registers(tag_to_write.address, &value).await
+                ctx.write_multiple_registers(tag_to_write.address, &value)
+                    .await
             }
             Command::Input => unimplemented!("An input register cannot be written."),
-        }.map_err(|err| WriteError(err.to_string()))?;
+        }
+        .map_err(|err| WriteError(err.to_string()))?;
 
         ctx.disconnect()
             .await
@@ -170,8 +168,8 @@ fn from_coil_to_word<'a>(
     data: impl Future<Output = Result<Vec<bool>, std::io::Error>> + std::marker::Send + 'a,
 ) -> Pin<Box<dyn Future<Output = Result<Vec<u16>, std::io::Error>> + std::marker::Send + 'a>> {
     Box::pin(async {
-
-        Ok(data.await?
+        Ok(data
+            .await?
             .iter()
             .map(|b| match b {
                 true => 1,
@@ -180,7 +178,6 @@ fn from_coil_to_word<'a>(
             .collect())
     })
 }
-
 
 fn parse_readed(data: Vec<u16>, tag: &ModbusTcpTag) -> TagValue {
     let data: Vec<u16> = match tag.swap {

@@ -97,11 +97,11 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             .map_err(|err| ReadError(err.0))?;
 
         let readed_data = match tag.command {
-            Command::Coil =>
-                from_coil_to_word(ctx.read_coils(tag.address, tag.length)),
+            Command::Coil => from_coil_to_word(ctx.read_coils(tag.address, tag.length)),
 
-            Command::Discrete =>
-                from_coil_to_word(ctx.read_discrete_inputs(tag.address, tag.length)),
+            Command::Discrete => {
+                from_coil_to_word(ctx.read_discrete_inputs(tag.address, tag.length))
+            }
 
             Command::Holding => ctx.read_holding_registers(tag.address, tag.length),
 
@@ -116,10 +116,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             .await
             .map_err(|err| ReadError(err.to_string()))?;
 
-        let parsed_data = parse_readed(
-            readed_data,
-            &tag,
-        );
+        let parsed_data = parse_readed(readed_data, &tag);
 
         // Making this little sleep we block the handler during X time
         // this time gives the cheaper devices some more time to handle
@@ -156,8 +153,10 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
         dbg!(value_to_write);
 
         match tag.command {
-            Command::Coil => ctx
-                .write_single_coil(tag.address, value_to_write.iter().sum::<u8>() != 0).await,
+            Command::Coil => {
+                ctx.write_single_coil(tag.address, value_to_write.iter().sum::<u8>() != 0)
+                    .await
+            }
 
             Command::Discrete => unimplemented!("A discrete register cannot be written."),
 
@@ -174,7 +173,8 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             }
 
             Command::Input => unimplemented!("An input register cannot be written."),
-        }.map_err(|err| WriteError(err.to_string()))?;
+        }
+        .map_err(|err| WriteError(err.to_string()))?;
 
         ctx.disconnect()
             .await
@@ -199,8 +199,8 @@ fn from_coil_to_word<'a>(
     data: impl Future<Output = Result<Vec<bool>, std::io::Error>> + std::marker::Send + 'a,
 ) -> Pin<Box<dyn Future<Output = Result<Vec<u16>, std::io::Error>> + std::marker::Send + 'a>> {
     Box::pin(async {
-
-        Ok(data.await?
+        Ok(data
+            .await?
             .iter()
             .map(|b| match b {
                 true => 1,
