@@ -2,6 +2,4 @@
 /modbus_tcp
 /modbus_rtu
 Cargo.lock
-Cargo.lock
-*.ini
 *.ini
