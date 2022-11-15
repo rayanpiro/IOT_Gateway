@@ -107,6 +107,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         # TODO: if any of the build step fails, the release should be deleted.
         with:
-            files: 'iot_gateway'
+            files: 'iot_gateway*'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
