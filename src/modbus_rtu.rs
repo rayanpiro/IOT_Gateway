@@ -159,7 +159,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             Command::Coil => ctx
                 .write_single_coil(tag.address, value_to_write.iter().sum::<u8>() != 0).await,
 
-            Command::Discrete => unimplemented!("A discrete register cannot be writted."),
+            Command::Discrete => unimplemented!("A discrete register cannot be written."),
 
             Command::Holding => {
                 let value: Vec<u16> = value_to_write
@@ -173,7 +173,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
                 ctx.write_multiple_registers(tag.address, &value).await
             }
 
-            Command::Input => unimplemented!("An input register cannot be writted."),
+            Command::Input => unimplemented!("An input register cannot be written."),
         }.map_err(|err| WriteError(err.to_string()))?;
 
         ctx.disconnect()

@@ -49,7 +49,7 @@ gen_readable_struct!(
 );
 
 impl TValidTag for ModbusTcpTag {
-    fn get_name(&self) -> &str{
+    fn get_name(&self) -> &str {
         &self.name
     }
     fn get_freq(&self) -> &TagReadFrequency {
@@ -61,7 +61,7 @@ impl TValidTag for ModbusTcpTag {
 pub struct ModbusTcpDevice(pub ModbusTcpConnection);
 
 use crate::models::device::{ReadError, THardDevice, WriteError};
-use crate::models::tag::{TagResponse, TagValue, TagReadFrequency, TValidTag};
+use crate::models::tag::{TValidTag, TagReadFrequency, TagResponse, TagValue};
 
 #[derive(Debug, Clone)]
 struct ModbusTcpError(String);
@@ -88,51 +88,36 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
     }
 
     async fn read(&self, tag: &ModbusTcpTag) -> Result<TagResponse, ReadError> {
-        let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
+        let mut ctx = self
+            .connect()
+            .await
+            .map_err(|err| ReadError(err.0))?;
 
-        let tag_to_read = tag;
+        let readed_data = match tag.command {
+            Command::Coil =>
+                from_coil_to_word(ctx.read_coils(tag.address, tag.length)),
+            Command::Discrete =>
+                from_coil_to_word(ctx.read_discrete_inputs(tag.address, tag.length)),
+            Command::Holding => ctx.read_holding_registers(tag.address, tag.length),
+            Command::Input => ctx.read_input_registers(tag.address, tag.length),
+        };
 
-        let readed_data = match tag_to_read.command {
-            Command::Coil => from_coil_to_word(
-                ctx.read_coils(tag_to_read.address, tag_to_read.length)
-                    .await
-                    .map_err(|err| ReadError(err.to_string())),
-            ),
-            Command::Discrete => from_coil_to_word(
-                ctx.read_discrete_inputs(tag_to_read.address, tag_to_read.length)
-                    .await
-                    .map_err(|err| ReadError(err.to_string())),
-            ),
-            Command::Holding => ctx
-                .read_holding_registers(tag_to_read.address, tag_to_read.length)
-                .await
-                .map_err(|err| ReadError(err.to_string())),
-            Command::Input => ctx
-                .read_input_registers(tag_to_read.address, tag_to_read.length)
-                .await
-                .map_err(|err| ReadError(err.to_string())),
-        }?;
+        let readed_data = readed_data
+            .await
+            .map_err(|err| ReadError(err.to_string()))?;
 
-        ctx.disconnect().await
+        ctx.disconnect()
+            .await
             .map_err(|err| ReadError(err.to_string()))?;
 
         let parsed_data = parse_for_type(
             readed_data,
-            tag_to_read.data_type.clone(),
-            tag_to_read.swap.clone(),
+            &tag,
         );
 
-        let readed_value: f32 = parsed_data.parse().unwrap();
-        let scaled_value = readed_value*tag_to_read.multiplier;
-
-        let value = match is_integer(scaled_value) {
-            true  => TagValue::I32(scaled_value as i32),
-            false => TagValue::F32(scaled_value),
-        };
-
         Ok(TagResponse {
-            id: tag_to_read.name.clone(),
-            value,
+            id: tag.name.clone(),
+            value: parsed_data,
         })
     }
 
@@ -144,63 +129,68 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
             TagValue::F32(x) => {
                 let scaled_value: f32 = x;
                 scaled_value.to_be_bytes()
-            },
+            }
             TagValue::I32(x) => {
                 let scaled_value = x;
                 scaled_value.to_be_bytes()
-            },
+            }
         };
 
         dbg!(value_to_write);
 
         match tag_to_write.command {
-            Command::Coil => ctx.write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0)
-                    .await
-                    .map_err(|err| WriteError(err.to_string()),
-            ),
-            Command::Discrete => unimplemented!("A discrete register cannot be writted."),
+            Command::Coil => ctx
+                .write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0).await,
+            Command::Discrete => unimplemented!("A discrete register cannot be written."),
             Command::Holding => {
-                let value: Vec<u16> = value_to_write.windows(2)
+                let value: Vec<u16> = value_to_write
+                    .windows(2)
                     .map(|pair| {
                         let word: [u8; 2] = [pair[0].clone(), pair[1].clone()];
                         u16::from_be_bytes(word)
                     })
                     .collect();
-                    
-                ctx
-                    .write_multiple_registers(tag_to_write.address, &value)
-                    .await
-                    .map_err(|err| WriteError(err.to_string()))
-            },
-            Command::Input => unimplemented!("A discrete register cannot be writted."),
-        }?;
 
-        ctx.disconnect().await
+                ctx.write_multiple_registers(tag_to_write.address, &value).await
+            }
+            Command::Input => unimplemented!("An input register cannot be written."),
+        }.map_err(|err| WriteError(err.to_string()))?;
+
+        ctx.disconnect()
+            .await
             .map_err(|err| WriteError(err.to_string()))?;
-        
+
         Ok(())
     }
 }
 
-fn from_coil_to_word(data: Result<Vec<bool>, ReadError>) -> Result<Vec<u16>, ReadError> {
-    Ok(data?
-        .iter()
-        .map(|b| match b {
-            true => 1,
-            false => 0,
-        })
-        .collect())
+use core::future::Future;
+use core::pin::Pin;
+fn from_coil_to_word<'a>(
+    data: impl Future<Output = Result<Vec<bool>, std::io::Error>> + std::marker::Send + 'a,
+) -> Pin<Box<dyn Future<Output = Result<Vec<u16>, std::io::Error>> + std::marker::Send + 'a>> {
+    Box::pin(async {
+
+        Ok(data.await?
+            .iter()
+            .map(|b| match b {
+                true => 1,
+                false => 0,
+            })
+            .collect())
+    })
 }
 
-fn parse_for_type(data: Vec<u16>, data_type: Type, swap: Swap) -> String {
-    let data: Vec<u16> = match swap {
+
+fn parse_for_type(data: Vec<u16>, tag: &ModbusTcpTag) -> TagValue {
+    let data: Vec<u16> = match tag.swap {
         Swap::LittleEndian => data.iter().map(|w| swap_bytes(w)).rev().collect(),
         Swap::BigEndian => data,
         Swap::LittleEndianSwap => swap_words(data.iter().map(|w| swap_bytes(w)).rev().collect()),
         Swap::BigEndianSwap => swap_words(data),
     };
 
-    match data_type {
+    let data_as_string = match tag.data_type {
         Type::Integer => data
             .iter()
             .fold(0u32, |acc, &num| acc << 16 | num as u32)
@@ -209,13 +199,20 @@ fn parse_for_type(data: Vec<u16>, data_type: Type, swap: Swap) -> String {
             let num = data.iter().fold(0u32, |acc, &num| acc << 16 | num as u32);
             format!("{:.2}", f32::from_bits(num))
         }
+    };
+
+    let readed_value: f32 = data_as_string.parse().unwrap();
+    let scaled_value = readed_value * tag.multiplier;
+
+    match is_integer(scaled_value) {
+        true => TagValue::I32(scaled_value as i32),
+        false => TagValue::F32(scaled_value),
     }
 }
 
 fn is_integer(value: f32) -> bool {
     value == value.round()
 }
-
 
 fn swap_words(words: Vec<u16>) -> Vec<u16> {
     let mut data = words.clone();
