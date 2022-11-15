@@ -1,7 +1,9 @@
 use std::{marker::PhantomData, str::FromStr};
 
-use super::device::{ReadError, WriteError, THardDevice};
+use super::device::{ReadError, THardDevice, WriteError};
 use async_trait::async_trait;
+
+const TAG_REQUEST_SECONDS_TO_TIMEOUT: u64 = 4;
 
 #[derive(Debug, Clone)]
 pub struct TagResponse {
@@ -37,8 +39,8 @@ impl TagReadFrequency {
     pub fn to_seconds(&self) -> u64 {
         match self {
             Self::Seconds(sec) => sec.clone(),
-            Self::Minutes(min) => min*60,
-            Self::Hours(hour) => hour*3600,
+            Self::Minutes(min) => min * 60,
+            Self::Hours(hour) => hour * 3600,
         }
     }
 }
@@ -57,7 +59,6 @@ impl FromStr for TagReadFrequency {
             _ => unimplemented!("Invalid marker!"),
         }
     }
-
 }
 
 #[async_trait]
@@ -82,17 +83,30 @@ pub struct TagId<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: TValidTa
 }
 
 #[async_trait]
-impl<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: TValidTag + Send + Sync + 'static> TTag for TagId<T, C, S> {
+impl<T: THardDevice<C, S> + Send + Sync, C: Send + Sync, S: TValidTag + Send + Sync + 'static> TTag
+    for TagId<T, C, S>
+{
     async fn read(&self) -> Result<TagResponse, ReadError> {
-        self.handler.lock().await.read(&self.tag).await
+        let device_lock = self.handler.lock().await;
+        tokio::time::timeout(
+            tokio::time::Duration::new(TAG_REQUEST_SECONDS_TO_TIMEOUT, 0),
+            device_lock.read(&self.tag),
+        )
+        .await
+        .map_err(|err| ReadError(err.to_string()))?
     }
 
     async fn write(&self, value: TagValue) -> Result<(), WriteError> {
-        self.handler.lock().await.write(&self.tag, value).await
+        let device_lock = self.handler.lock().await;
+        tokio::time::timeout(
+            tokio::time::Duration::new(TAG_REQUEST_SECONDS_TO_TIMEOUT, 0),
+            device_lock.write(&self.tag, value),
+        )
+        .await
+        .map_err(|err| WriteError(err.to_string()))?
     }
 
     fn get_tag(&self) -> Arc<dyn TValidTag> {
         self.tag.clone()
     }
-
 }
