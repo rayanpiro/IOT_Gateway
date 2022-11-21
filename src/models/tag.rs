@@ -11,7 +11,7 @@ pub struct TagResponse {
     pub value: TagValue,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TagValue {
     F32(f32),
     // U32(u32),
