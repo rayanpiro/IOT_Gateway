@@ -28,8 +28,8 @@ jobs:
       - name: cargo fmt -- --check
         uses: dtolnay/rust-toolchain@stable
         with:
-          command: cargo fmt
-          args: --all -- --check
+          command: cargo
+          args: fmt --all -- --check
 
   deploy:
     name: deploy
@@ -49,16 +49,11 @@ jobs:
           target: ${{ matrix.target }}
       - name: Install cross
         uses: dtolnay/rust-toolchain@stable
-        with:
-          command: cargo
-          args: install cross
+        run: cargo install cross
 
       - name: Build target
         uses: dtolnay/rust-toolchain@stable
-        with:
-          use-cross: true
-          command: cross
-          args: build --release --target ${{ matrix.target }}
+        run: cross build --release --target ${{ matrix.target }}
 
       - name: Package
         shell: bash
