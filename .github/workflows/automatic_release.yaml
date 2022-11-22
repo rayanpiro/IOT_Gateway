@@ -14,16 +14,6 @@ jobs:
     name: Check Style
     runs-on: ubuntu-latest
     steps:
-<<<<<<< HEAD
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: List files in directory
-        run: pwd && ls -lah . && ls -lah ../
-
-      - name: cargo fmt -- --check
-        run: cargo fmt --all -- --check
-=======
       - name: Checkout
         uses: actions/checkout@v1
 
@@ -40,7 +30,6 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
->>>>>>> parent of 5b02dd6 (Update automatic_release.yaml)
 
   deploy:
     name: deploy
@@ -51,11 +40,8 @@ jobs:
       matrix:
         target: [ mips-unknown-linux-musl ]
     steps:
-<<<<<<< HEAD
-=======
       - name: Checkout
         uses: actions/checkout@v1
->>>>>>> parent of 5b02dd6 (Update automatic_release.yaml)
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
@@ -63,15 +49,11 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Build target
-<<<<<<< HEAD
-        run: cargo build --release --target ${{ matrix.target }}
-=======
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
           args: --release --target ${{ matrix.target }}
->>>>>>> parent of 5b02dd6 (Update automatic_release.yaml)
 
       - name: Package
         shell: bash
