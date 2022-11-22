@@ -252,7 +252,6 @@ fn swap_bytes(word: &u16) -> u16 {
     word.rotate_left(8)
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -260,24 +259,31 @@ mod tests {
     async fn test_from_coil_to_word() {
         use super::from_coil_to_word;
 
-        let async_response = |bool_vec: Vec<bool>| async move {
-            Ok(bool_vec)
-        };
+        let async_response = |bool_vec: Vec<bool>| async move { Ok(bool_vec) };
 
         let bool_vec = vec![true, true, false, false];
-        assert_eq!(vec![1, 1, 0, 0], from_coil_to_word(async_response(bool_vec)).await.unwrap());
+        assert_eq!(
+            vec![1, 1, 0, 0],
+            from_coil_to_word(async_response(bool_vec)).await.unwrap()
+        );
 
         let bool_vec = vec![true, false, false, true];
-        assert_eq!(vec![1, 0, 0, 1], from_coil_to_word(async_response(bool_vec)).await.unwrap());
+        assert_eq!(
+            vec![1, 0, 0, 1],
+            from_coil_to_word(async_response(bool_vec)).await.unwrap()
+        );
 
         let bool_vec = vec![true, true, false, false];
-        assert_ne!(vec![0, 0, 0, 0], from_coil_to_word(async_response(bool_vec)).await.unwrap());
+        assert_ne!(
+            vec![0, 0, 0, 0],
+            from_coil_to_word(async_response(bool_vec)).await.unwrap()
+        );
     }
 
     #[test]
     fn test_parse_readed() {
+        use super::{parse_readed, Command, ModbusRtuTag, Swap, TagValue, Type};
         use crate::models::tag::TagReadFrequency;
-        use super::{ parse_readed, ModbusRtuTag, Command, Type, Swap, TagValue };
 
         let mut tag = ModbusRtuTag {
             name: String::from("TEST"),
@@ -293,7 +299,7 @@ mod tests {
 
         let u16_vec: Vec<u16> = vec![0, 0xE8];
         assert_eq!(TagValue::F32(23.2), parse_readed(u16_vec, &tag));
-        
+
         tag.multiplier = 1.0;
         let u16_vec: Vec<u16> = vec![0, 0xE8];
         assert_eq!(TagValue::I32(232), parse_readed(u16_vec, &tag));
@@ -313,7 +319,5 @@ mod tests {
         tag.swap = Swap::LittleEndianSwap;
         let u16_vec: Vec<u16> = vec![0, 0xE8];
         assert_eq!(TagValue::I32(59392), parse_readed(u16_vec, &tag));
-
-
     }
 }

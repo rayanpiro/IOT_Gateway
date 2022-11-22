@@ -96,8 +96,8 @@ async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
     }
 
     match sched.start().await.unwrap().await {
-        Ok(_) => {},
-        Err(_) => {},
+        Ok(_) => {}
+        Err(_) => {}
     };
 }
 
@@ -119,12 +119,12 @@ async fn one_shot_read(tags: Vec<Arc<dyn TTag>>, tag_to_read: &str, retries: u32
         match tag.unwrap().read().await {
             Ok(x) => {
                 return x.value.to_string();
-            },
+            }
             Err(_) => (),
         };
         retries -= 1;
     }
-    return error_msg
+    return error_msg;
 }
 
 use clap::Parser;
@@ -133,7 +133,7 @@ use clap::Parser;
 struct Args {
     #[arg(short, long)]
     tag_name: Option<String>,
-    
+
     #[arg(short, long, default_value_t = 1)]
     retry: u32,
 }
