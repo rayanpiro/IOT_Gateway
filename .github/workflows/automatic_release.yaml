@@ -18,7 +18,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       
       - name: List files in directory
-        run: ls -lah
+        run: pwd && ls -lah . && ls -lah ../
 
       - name: cargo fmt -- --check
         run: cargo fmt --all -- --check
