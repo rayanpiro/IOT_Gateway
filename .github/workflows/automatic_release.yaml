@@ -40,8 +40,6 @@ jobs:
       matrix:
         target: [ mips-unknown-linux-musl ]
     steps:
-      - name: Checkout
-        uses: dtolnay/rust-toolchain@stable
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -49,13 +47,18 @@ jobs:
           profile: minimal
           override: true
           target: ${{ matrix.target }}
+      - name: Install cross
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          command: cargo
+          args: install cross
 
       - name: Build target
         uses: dtolnay/rust-toolchain@stable
         with:
           use-cross: true
-          command: cargo build
-          args: --release --target ${{ matrix.target }}
+          command: cross
+          args: build --release --target ${{ matrix.target }}
 
       - name: Package
         shell: bash
