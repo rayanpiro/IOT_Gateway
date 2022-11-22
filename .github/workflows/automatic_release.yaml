@@ -19,9 +19,8 @@ jobs:
       
       - name: List files in directory
         run: ls -lah
-        
+
       - name: cargo fmt -- --check
-        run: ls -lah
         run: cargo fmt --all -- --check
 
   deploy:
