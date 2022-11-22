@@ -14,22 +14,14 @@ jobs:
     name: Check Style
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt
-          profile: minimal
-          override: true
 
       - name: cargo fmt -- --check
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          command: cargo
-          args: fmt --all -- --check
+        run: cargo fmt --all -- --check
 
   deploy:
     name: deploy
@@ -48,11 +40,8 @@ jobs:
           override: true
           target: ${{ matrix.target }}
 
-      - name: Install cross
-        run: cargo install cross
-
       - name: Build target
-        run: cross build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package
         shell: bash
