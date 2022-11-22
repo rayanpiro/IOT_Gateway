@@ -47,12 +47,11 @@ jobs:
           profile: minimal
           override: true
           target: ${{ matrix.target }}
+
       - name: Install cross
-        uses: dtolnay/rust-toolchain@stable
         run: cargo install cross
 
       - name: Build target
-        uses: dtolnay/rust-toolchain@stable
         run: cross build --release --target ${{ matrix.target }}
 
       - name: Package
