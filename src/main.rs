@@ -95,37 +95,58 @@ async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
         sched.add(job).await.unwrap();
     }
 
-    dbg!(sched.start().await.unwrap().await);
+    match sched.start().await.unwrap().await {
+        Ok(_) => {},
+        Err(_) => {},
+    };
 }
 
-async fn one_shot_read(tags: Vec<Arc<dyn TTag>>, tag_to_read: &str) {
-    const ERROR_MSG: &'static str = "Error";
+async fn one_shot_read(tags: Vec<Arc<dyn TTag>>, tag_to_read: &str, retries: u32) -> String {
+    let error_msg: String = "Error".to_string();
 
-    let filtered_tags = tags
+    let mut retries = retries;
+
+    let tag = tags
         .iter()
-        .filter(|t| t.get_tag().get_name() == tag_to_read);
+        .filter(|t| t.get_tag().get_name() == tag_to_read)
+        .nth(0);
 
-    if filtered_tags.clone().count() == 0 {
-        print!("{}", ERROR_MSG);
+    if let None = tag {
+        return error_msg;
     }
 
-    for t in filtered_tags {
-        let t = t.clone();
-        let res = t.read().await;
-        match res {
-            Ok(x) => print!("{}", x.value.to_string()),
-            Err(_) => print!("{}", ERROR_MSG),
+    while retries > 0 {
+        match tag.unwrap().read().await {
+            Ok(x) => {
+                return x.value.to_string();
+            },
+            Err(_) => (),
         };
+        retries -= 1;
     }
+    return error_msg
+}
+
+use clap::Parser;
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    tag_name: Option<String>,
+    
+    #[arg(short, long, default_value_t = 1)]
+    retry: u32,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tags: Vec<Arc<dyn TTag>> = from_ini();
 
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() == 2 {
-        one_shot_read(tags, args.get(1).unwrap()).await;
+    let arguments = Args::parse();
+
+    if arguments.tag_name != None {
+        let return_value = one_shot_read(tags, &arguments.tag_name.unwrap(), arguments.retry).await;
+        print!("{}", return_value);
     } else {
         daemon_mode(tags).await;
     }
