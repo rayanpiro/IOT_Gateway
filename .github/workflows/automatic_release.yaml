@@ -16,7 +16,10 @@ jobs:
     steps:
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
-
+      
+      - name: List files in directory
+        run: ls -lah
+        
       - name: cargo fmt -- --check
         run: ls -lah
         run: cargo fmt --all -- --check
