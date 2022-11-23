@@ -3,6 +3,7 @@ mod device_protocols;
 mod models;
 mod running_modes;
 
+use config_files::read_files::get_tags_from_ini_files;
 use running_modes::{daemon_mode, tag_one_shot_read};
 use tokio;
 
@@ -19,7 +20,6 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use config_files::read_files::get_tags_from_ini_files;
     let tags = get_tags_from_ini_files();
 
     let arguments = Args::parse();
