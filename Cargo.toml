@@ -13,6 +13,7 @@ tokio-cron-scheduler = "*"
 async-trait = "0.1.58"
 futures = "0.3.25"
 clap = { version="4.0.25", features=["derive"] }
+gmqtt-client = "0.2.0"
 
 [profile.release]
 opt-level = "z"
