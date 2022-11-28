@@ -87,6 +87,10 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
         ModbusTcpDevice(connection)
     }
 
+    fn get_device_name(&self) -> String {
+        self.0.name.clone()
+    }
+
     async fn read(&self, tag: &ModbusTcpTag) -> Result<TagResponse, ReadError> {
         let mut ctx = self.connect().await.map_err(|err| ReadError(err.0))?;
 
@@ -107,7 +111,7 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
             .await
             .map_err(|err| ReadError(err.to_string()))?;
 
-        let parsed_data = parse_readed(readed_data, &tag);
+        let parsed_data = parse_readed(readed_data, tag);
 
         Ok(TagResponse {
             id: tag.name.clone(),
@@ -142,7 +146,7 @@ impl THardDevice<ModbusTcpConnection, ModbusTcpTag> for ModbusTcpDevice {
                 let value: Vec<u16> = value_to_write
                     .windows(2)
                     .map(|pair| {
-                        let word: [u8; 2] = [pair[0].clone(), pair[1].clone()];
+                        let word: [u8; 2] = [pair[0], pair[1]];
                         u16::from_be_bytes(word)
                     })
                     .collect();
@@ -181,9 +185,9 @@ fn from_coil_to_word<'a>(
 
 fn parse_readed(data: Vec<u16>, tag: &ModbusTcpTag) -> TagValue {
     let data: Vec<u16> = match tag.swap {
-        Swap::LittleEndian => data.iter().map(|w| swap_bytes(w)).rev().collect(),
+        Swap::LittleEndian => data.iter().map(swap_bytes).rev().collect(),
         Swap::BigEndian => data,
-        Swap::LittleEndianSwap => swap_words(data.iter().map(|w| swap_bytes(w)).rev().collect()),
+        Swap::LittleEndianSwap => swap_words(data.iter().map(swap_bytes).rev().collect()),
         Swap::BigEndianSwap => swap_words(data),
     };
 
@@ -212,7 +216,7 @@ fn is_integer(value: f32) -> bool {
 }
 
 fn swap_words(words: Vec<u16>) -> Vec<u16> {
-    let mut data = words.clone();
+    let mut data = words;
     data.swap(0, 1);
     data.to_vec()
 }

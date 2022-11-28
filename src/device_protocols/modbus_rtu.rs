@@ -55,6 +55,7 @@ impl TValidTag for ModbusRtuTag {
     fn get_name(&self) -> &str {
         &self.name
     }
+
     fn get_freq(&self) -> &TagReadFrequency {
         &self.read_freq
     }
@@ -90,6 +91,10 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
         ModbusRtuOverTCPDevice(connection)
     }
 
+    fn get_device_name(&self) -> String {
+        self.0.name.clone()
+    }
+
     async fn read(&self, tag: &ModbusRtuTag) -> Result<TagResponse, ReadError> {
         let mut ctx = self
             .connect(Slave(tag.slave))
@@ -98,13 +103,10 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
 
         let readed_data = match tag.command {
             Command::Coil => from_coil_to_word(ctx.read_coils(tag.address, tag.length)),
-
             Command::Discrete => {
                 from_coil_to_word(ctx.read_discrete_inputs(tag.address, tag.length))
             }
-
             Command::Holding => ctx.read_holding_registers(tag.address, tag.length),
-
             Command::Input => ctx.read_input_registers(tag.address, tag.length),
         };
 
@@ -116,7 +118,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
             .await
             .map_err(|err| ReadError(err.to_string()))?;
 
-        let parsed_data = parse_readed(readed_data, &tag);
+        let parsed_data = parse_readed(readed_data, tag);
 
         // Making this little sleep we block the handler during X time
         // this time gives the cheaper devices some more time to handle
@@ -164,7 +166,7 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
                 let value: Vec<u16> = value_to_write
                     .windows(2)
                     .map(|pair| {
-                        let word: [u8; 2] = [pair[0].clone(), pair[1].clone()];
+                        let word: [u8; 2] = [pair[0], pair[1]];
                         u16::from_be_bytes(word)
                     })
                     .collect();
@@ -212,9 +214,9 @@ fn from_coil_to_word<'a>(
 
 fn parse_readed(data: Vec<u16>, tag: &ModbusRtuTag) -> TagValue {
     let data: Vec<u16> = match tag.swap {
-        Swap::LittleEndian => data.iter().map(|w| swap_bytes(w)).rev().collect(),
+        Swap::LittleEndian => data.iter().map(swap_bytes).rev().collect(),
         Swap::BigEndian => data,
-        Swap::LittleEndianSwap => swap_words(data.iter().map(|w| swap_bytes(w)).rev().collect()),
+        Swap::LittleEndianSwap => swap_words(data.iter().map(swap_bytes).rev().collect()),
         Swap::BigEndianSwap => swap_words(data),
     };
 
@@ -243,7 +245,7 @@ fn is_integer(value: f32) -> bool {
 }
 
 fn swap_words(words: Vec<u16>) -> Vec<u16> {
-    let mut data = words.clone();
+    let mut data = words;
     data.swap(0, 1);
     data.to_vec()
 }
