@@ -7,13 +7,12 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
     let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands()
         .expect("There is a problem initializing Mqtt Conection");
-    
+
     let mqtt_client = Arc::new(mqtt_client);
     let base_topic = Arc::new(base_topic);
 
     let sched = JobScheduler::new().await.unwrap();
     for t in tags.iter() {
-
         let seconds = t.get_tag().get_freq().to_seconds();
         let t = t.clone();
         let mqtt_client = mqtt_client.clone();
@@ -26,8 +25,13 @@ pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
                 let base_topic = base_topic.clone();
 
                 async move {
-                    let topic = &format!("{}/{}/{}", &base_topic, t.get_device_name(), t.get_tag().get_name());
-                    
+                    let topic = &format!(
+                        "{}/{}/{}",
+                        &base_topic,
+                        t.get_device_name(),
+                        t.get_tag().get_name()
+                    );
+
                     if let Ok(value) = t.read().await {
                         send_message(&mqtt_client, topic, &value).unwrap();
                     }
@@ -50,9 +54,7 @@ pub async fn tag_one_shot_read(
 
     let mut retries = retries;
 
-    let tag = tags
-        .iter()
-        .find(|t| t.get_tag().get_name() == tag_to_read);
+    let tag = tags.iter().find(|t| t.get_tag().get_name() == tag_to_read);
 
     if tag.is_none() {
         return error_msg;
@@ -60,7 +62,7 @@ pub async fn tag_one_shot_read(
 
     while retries > 0 {
         if let Ok(x) = tag.unwrap().read().await {
-                return x.value.to_string();
+            return x.value.to_string();
         }
         retries -= 1;
     }

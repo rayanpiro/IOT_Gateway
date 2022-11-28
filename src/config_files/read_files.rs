@@ -67,7 +67,7 @@ where
         .into_iter()
         .next()
         .unwrap();
-    
+
     let hard_device = T::new(connection);
     let device_name = hard_device.get_device_name();
     let mutex_device = Arc::new(Mutex::new(hard_device));
