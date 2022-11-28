@@ -1,13 +1,15 @@
 # Tipos de datos.
 
 1.  Datos peticion recurrente, frontend envia el ciclo de scan de esos datos y el hardware publica sin petición los mismos.
-En caso de no conexión se almacenan localmente (a definir) para su posterior envio por lotes. Necesario timestamp y dato.
-2.  Datos peticion bajo demanda. Frontend envia la peticion de un dato y el hardware responde el timestamp y el dato.
+En caso de no conexión se almacenan localmente (a definir) para su posterior envio por lotes.
+2.  Datos peticion bajo demanda. Frontend envia la peticion de un dato y el hardware responde el dato.
 En caso de no conexión el dato nunca llega a destino.
 3.  Eventos. Hardware monitoriza el cambio de estado de un dato y lo notifica a la plataforma.
-En caso de no conexión se almacenan localmente (a definir) para su posterior envio por lotes. Necesario timestamp y dato.
-4.  Comandos. Ping, peticion de dato, write para comandar.
-En caso de no conexión el dato nunca llega a destino.
+En caso de no conexión se almacenan localmente (a definir) para su posterior envio por lotes.
+4.  Comandos:
+    - Ping: Realiza una lectura. Si es satisfactoria devuelve un PONG del device, si no devuelve el error al cabo de un TIMEOUT_S.
+    - Read: Realiza una lectura. Si es satisfactoria devuelve un dato, si no devuelve el error.
+    - Write \<dato\>: Realiza una escritura del dato pasado como parametro en el tag elegido.
 
 # Arbol de directorios.
 
@@ -49,10 +51,10 @@ Ejemplo de publishers.ini para protocolo modbus tcp.
 
 # Estructura MQTT.
 
-    /client_id/warehouse_id/device_id/
-                                      /measures/{tag_name}  -> Publicación de las medidas sin petición.
-                                      /events/{tag_name}    -> Publicación de cambios de estado sin petición.
-                                      /commands/{tag_name}  -> Envio de comandos de escritura, peticion de lectura, PING request.
+    /client_id/warehouse_id/
+                            /measures/{device_id}/{tag_name}  -> Publicación de las medidas sin petición.
+                            /events/{device_id}/{tag_name}    -> Publicación de cambios de estado sin petición.
+                            /commands/{device_id}/{tag_name}  -> Envio de comandos de escritura, peticion de lectura, PING request.
 
 # Estructura del codigo.
 1. Leer la carpeta config que tendrá a su vez una carpeta por cada protocolo.
