@@ -26,15 +26,15 @@ where
 {
     let mut vec = Vec::new();
     let fhandler = ini::Ini::load_from_file(filename)
-        .expect(&format!("Error opening or parsing file {}.", filename));
+        .unwrap_or_else(|_| panic!("Error opening or parsing file {}.", filename));
 
     // Iterate in every section to get the needed
     fhandler.sections().for_each(|section| {
         let data = parse_section(&fhandler, section)
-            .expect(&format!("Error while parsing file {}.", filename));
+            .unwrap_or_else(|_| panic!("Error while parsing file {}.", filename));
 
         let parsed_data =
-            T::try_from(data).expect(&format!("Error while parsing file {}.", filename));
+            T::try_from(data).unwrap_or_else(|_| panic!("Error while parsing file {}.", filename));
         vec.push(parsed_data);
     });
     vec
@@ -42,7 +42,7 @@ where
 
 #[macro_export]
 macro_rules! gen_matcher {
-    (enum $e_name:ident { $( $field:ident),*, }) => {
+    (enum $e_name:ident { $( $field:ident ),*, }) => {
         #[derive(Debug, Clone)]
         pub enum $e_name {
             $(
