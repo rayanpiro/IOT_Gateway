@@ -1,7 +1,10 @@
+use std::str::Split;
+use std::time::Instant;
+
 use crate::config_files::read_files::get_mqtt_config;
 use crate::models::tag::TagResponse;
 use crate::{gen_matcher, gen_readable_struct};
-use gmqtt_client::{MqttClient, MqttClientBuilder, QoS};
+use gmqtt_client::{MqttClient, MqttClientBuilder, QoS, Message};
 use url::Url;
 
 gen_matcher!(
@@ -60,6 +63,35 @@ impl std::fmt::Display for MqttError {
     }
 }
 
+fn process_recv_mqtt_command(msg: Message, _instant: Instant) {
+    let payload = msg.payload_str().into_owned();
+    let tag_name: &str = msg.topic()
+        .split('/')
+        .last()
+        .unwrap();
+    
+    dbg!(tag_name);
+
+    let splitted_payload = payload
+        .split(" ")
+        .collect::<Vec<&str>>();
+
+    match splitted_payload.as_slice() {
+        ["PING"] => {
+            println!("PING COMMAND")
+        },
+        ["READ"] => {
+            println!("READ COMMAND")
+        },
+        ["WRITE", value] => {
+            println!("WRITE VALUE: {} COMMAND", value)
+        },
+        _ => {
+            println!("Invalid Command!")
+        },
+    };
+}
+
 pub fn send_message(client: &MqttClient, topic: &str, msg: &TagResponse) -> Result<(), MqttError> {
     client
         .publish_json(topic, msg, false, QoS::AtLeastOnce, None)
@@ -79,13 +111,7 @@ pub fn connect_broker_subscribing_to_commands() -> Result<(MqttClient, String), 
     let url = Url::parse(&broker_address).map_err(|err| MqttError(err.to_string()))?;
 
     let (mqtt_client, mqtt_worker) = MqttClientBuilder::new(url)
-        .on_message_owned_callback(|message, instant| {
-            println!(
-                "Message: {:?} received {} us ago",
-                message,
-                instant.elapsed().as_micros()
-            );
-        })
+        .on_message_owned_callback(process_recv_mqtt_command)
         .subscribe(topic_subscribe, qos)
         .build();
 
