@@ -7,13 +7,15 @@ edition = "2021"
 
 [dependencies]
 rust-ini = "0.18.0"
-tokio-modbus = { version = "0.5.3", default-features = false, features = ["tcp", "rtu"] }
+serde = { version = "1.0.148", features = ["derive"] }
+tokio-modbus = { version = "0.5.3", features = ["tcp", "rtu"] }
 tokio = { version = "1.21.2", features = ["full"] }
 tokio-cron-scheduler = "*"
 async-trait = "0.1.58"
 futures = "0.3.25"
 clap = { version="4.0.25", features=["derive"] }
-gmqtt-client = "0.2.0"
+gmqtt-client = { version = "0.2.0", features=["json"] }
+url = "2.3.1"
 
 [profile.release]
 opt-level = "z"
