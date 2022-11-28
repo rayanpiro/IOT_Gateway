@@ -4,7 +4,7 @@ use std::time::Instant;
 use crate::config_files::read_files::get_mqtt_config;
 use crate::models::tag::TagResponse;
 use crate::{gen_matcher, gen_readable_struct};
-use gmqtt_client::{MqttClient, MqttClientBuilder, QoS, Message};
+use gmqtt_client::{Message, MqttClient, MqttClientBuilder, QoS};
 use url::Url;
 
 gen_matcher!(
@@ -65,30 +65,25 @@ impl std::fmt::Display for MqttError {
 
 fn process_recv_mqtt_command(msg: Message, _instant: Instant) {
     let payload = msg.payload_str().into_owned();
-    let tag_name: &str = msg.topic()
-        .split('/')
-        .last()
-        .unwrap();
-    
+    let tag_name: &str = msg.topic().split('/').last().unwrap();
+
     dbg!(tag_name);
 
-    let splitted_payload = payload
-        .split(" ")
-        .collect::<Vec<&str>>();
+    let splitted_payload = payload.split(" ").collect::<Vec<&str>>();
 
     match splitted_payload.as_slice() {
         ["PING"] => {
             println!("PING COMMAND")
-        },
+        }
         ["READ"] => {
             println!("READ COMMAND")
-        },
+        }
         ["WRITE", value] => {
             println!("WRITE VALUE: {} COMMAND", value)
-        },
+        }
         _ => {
             println!("Invalid Command!")
-        },
+        }
     };
 }
 
