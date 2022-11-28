@@ -1,3 +1,4 @@
+use crate::cloud_protocols::mqtt::MqttIniConfig;
 use crate::device_protocols::modbus_rtu::{
     ModbusRtuOverTCPConnection, ModbusRtuOverTCPDevice, ModbusRtuTag,
 };
@@ -13,7 +14,16 @@ use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use super::ini_parser;
+
 const INI_PROTOCOL_FOLDERS: [&str; 2] = ["modbus_tcp/", "modbus_rtu/"];
+
+pub fn get_mqtt_config() -> MqttIniConfig {
+    ini_parser::read_file::<MqttIniConfig>("mqtt.ini")
+        .into_iter()
+        .next()
+        .expect("Invalid mqtt.ini file")
+}
 
 pub fn get_tags_from_ini_files() -> Vec<Arc<dyn TTag>> {
     let mut tags: Vec<Arc<dyn TTag>> = Vec::new();
@@ -53,19 +63,21 @@ where
 {
     let path = path.to_string();
 
-    use super::ini_parser;
     let connection = ini_parser::read_file::<C>(&(format!("{}/connection.ini", &path)))
         .into_iter()
-        .nth(0)
+        .next()
         .unwrap();
-
-    let mutex_device = Arc::new(Mutex::new(T::new(connection)));
+    
+    let hard_device = T::new(connection);
+    let device_name = hard_device.get_device_name();
+    let mutex_device = Arc::new(Mutex::new(hard_device));
 
     ini_parser::read_file::<S>(&(format!("{}/publishers.ini", &path)))
         .into_iter()
         .map(|t| {
             let tag: Arc<dyn TTag> = Arc::new(TagId {
                 handler: Arc::clone(&mutex_device),
+                device_name: device_name.clone(),
                 tag: Arc::new(t),
                 _phantom: PhantomData,
             });
