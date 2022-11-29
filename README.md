@@ -61,3 +61,11 @@ Ejemplo de publishers.ini para protocolo modbus tcp.
 2. Leer de forma recursiva las carpetas device_id con los ficheros correspondientes a cada protocolo. Necesario un ini_parser por cada protocolo.
 3. Cargar el Vec<Tag> en memoria, que contiene lo necesario para identificar un tag (su name), para conectarse (sus connection properties), y para leerlo o escribirlo (su address) propios de cada protocolo.
 4. Iniciar un bucle de lectura tanto de los tags como de los commands recibidos por el MQTT broker.
+
+# TODOS
+- Consensuar los mensajes de MQTT con David.
+- Probar las escrituras de Modbus TCP y Modbus RTU.
+- Hacer los tags dependientes del device. Entendiendo un device como un solo device (no una pasarela modbus rtu over ethernet). Para que un read al device devuelva el JSON de todos los tags del mismo.
+- Generar eventos.
+- Revisar los unwrap del codigo.
+- Integrar más test.
