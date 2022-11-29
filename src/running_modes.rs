@@ -3,9 +3,10 @@ use crate::models::tag::TTag;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
+use serde_json;
 
 pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
-    let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands()
+    let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands(tags.clone())
         .expect("There is a problem initializing Mqtt Conection");
 
     let mqtt_client = Arc::new(mqtt_client);
@@ -32,9 +33,9 @@ pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
                         t.get_tag().get_name()
                     );
 
-                    if let Ok(value) = t.read().await {
-                        send_message(&mqtt_client, topic, &value).unwrap();
-                    }
+                    let value = t.read().await;
+                    let json = serde_json::to_string(&value).unwrap();
+                    send_message(&mqtt_client, topic, &json).unwrap();
                 }
             })
         })

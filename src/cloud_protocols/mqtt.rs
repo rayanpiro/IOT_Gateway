@@ -1,11 +1,11 @@
-use std::str::Split;
-use std::time::Instant;
+use std::sync::Arc;
 
 use crate::config_files::read_files::get_mqtt_config;
-use crate::models::tag::TagResponse;
+use crate::models::tag::{TTag, TagResponse, TagValue};
 use crate::{gen_matcher, gen_readable_struct};
 use gmqtt_client::{Message, MqttClient, MqttClientBuilder, QoS};
 use url::Url;
+use serde_json;
 
 gen_matcher!(
     enum MqttQoS {
@@ -63,31 +63,58 @@ impl std::fmt::Display for MqttError {
     }
 }
 
-fn process_recv_mqtt_command(msg: Message, _instant: Instant) {
+async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<Arc<dyn TTag>>) {
     let payload = msg.payload_str().into_owned();
-    let tag_name: &str = msg.topic().split('/').last().unwrap();
-
-    dbg!(tag_name);
-
+    let recv_tag_name = msg.topic()
+        .rsplit("/")
+        .collect::<Vec<&str>>()
+        .into_iter()
+        .take(2)
+        .rev()
+        .collect::<Vec<&str>>()
+        .join("/");
+    
     let splitted_payload = payload.split(" ").collect::<Vec<&str>>();
+    let tag = tags.into_iter().find(|t| {
+        let t_name = format!("{}/{}", t.get_device_name(), t.get_tag().get_name());
+        t_name == recv_tag_name
+    });
+
+    if tag.is_none() {
+        return;
+    }
+
+    let tag = tag.unwrap();
+    let topic_to_sent = msg.topic().replace("/commands", "");
 
     match splitted_payload.as_slice() {
         ["PING"] => {
-            println!("PING COMMAND")
-        }
+            let result = tag.read().await;
+            if result.is_ok() {
+                send_message(&client, &topic_to_sent, "PONG").unwrap();
+            } else {
+                send_message(&client, &topic_to_sent, "Error").unwrap();
+            }
+        },
         ["READ"] => {
-            println!("READ COMMAND")
-        }
+            let result = tag.read().await;
+            let json = serde_json::to_string(&result).unwrap();
+            send_message(&client, &topic_to_sent, &json).unwrap();
+        },
         ["WRITE", value] => {
-            println!("WRITE VALUE: {} COMMAND", value)
-        }
+            let t_value = TagValue::I32(i32::from_str_radix(value, 10).unwrap());
+            let result = tag.write(t_value).await;
+            let json = serde_json::to_string(&result).unwrap();
+            send_message(&client, &topic_to_sent, &json).unwrap();
+            println!("WRITE VALUE: {} COMMAND", value);
+        },
         _ => {
-            println!("Invalid Command!")
-        }
+            println!("Invalid Command!");
+        },
     };
 }
 
-pub fn send_message(client: &MqttClient, topic: &str, msg: &TagResponse) -> Result<(), MqttError> {
+pub fn send_message(client: &MqttClient, topic: &str, msg: &str) -> Result<(), MqttError> {
     client
         .publish_json(topic, msg, false, QoS::AtLeastOnce, None)
         .map_err(|err| MqttError(err.to_string()))?;
@@ -95,7 +122,9 @@ pub fn send_message(client: &MqttClient, topic: &str, msg: &TagResponse) -> Resu
     Ok(())
 }
 
-pub fn connect_broker_subscribing_to_commands() -> Result<(MqttClient, String), MqttError> {
+pub fn connect_broker_subscribing_to_commands(
+    tags: Vec<Arc<dyn TTag>>,
+) -> Result<(MqttClient, String), MqttError> {
     let mqtt_config = get_mqtt_config();
 
     let protocol = mqtt_config.protocol.to_string();
@@ -106,11 +135,16 @@ pub fn connect_broker_subscribing_to_commands() -> Result<(MqttClient, String), 
     let url = Url::parse(&broker_address).map_err(|err| MqttError(err.to_string()))?;
 
     let (mqtt_client, mqtt_worker) = MqttClientBuilder::new(url)
-        .on_message_owned_callback(process_recv_mqtt_command)
         .subscribe(topic_subscribe, qos)
         .build();
+    
+        let callback_mqtt_client = mqtt_client.clone();
+        mqtt_client.set_on_message_callback(move |msg: &Message| {
+            let msg_owned = msg.clone();
+            tokio::spawn(process_recv_mqtt_command(callback_mqtt_client.clone(), msg_owned, tags.clone()));
+    });
 
     tokio::spawn(mqtt_worker.run());
 
-    Ok((mqtt_client, mqtt_config.mqtt_topic_installation_prefix))
+    Ok((mqtt_client.clone(), mqtt_config.mqtt_topic_installation_prefix))
 }
