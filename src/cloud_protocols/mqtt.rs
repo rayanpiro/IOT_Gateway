@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use crate::config_files::read_files::get_mqtt_config;
-use crate::models::tag::{TTag, TagResponse, TagValue};
+use crate::models::tag::{TTag, TagValue};
 use crate::{gen_matcher, gen_readable_struct};
 use gmqtt_client::{Message, MqttClient, MqttClientBuilder, QoS};
-use url::Url;
 use serde_json;
+use url::Url;
 
 gen_matcher!(
     enum MqttQoS {
@@ -65,7 +65,8 @@ impl std::fmt::Display for MqttError {
 
 async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<Arc<dyn TTag>>) {
     let payload = msg.payload_str().into_owned();
-    let recv_tag_name = msg.topic()
+    let recv_tag_name = msg
+        .topic()
         .rsplit("/")
         .collect::<Vec<&str>>()
         .into_iter()
@@ -73,7 +74,7 @@ async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<A
         .rev()
         .collect::<Vec<&str>>()
         .join("/");
-    
+
     let splitted_payload = payload.split(" ").collect::<Vec<&str>>();
     let tag = tags.into_iter().find(|t| {
         let t_name = format!("{}/{}", t.get_device_name(), t.get_tag().get_name());
@@ -95,22 +96,22 @@ async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<A
             } else {
                 send_message(&client, &topic_to_sent, "Error").unwrap();
             }
-        },
+        }
         ["READ"] => {
             let result = tag.read().await;
             let json = serde_json::to_string(&result).unwrap();
             send_message(&client, &topic_to_sent, &json).unwrap();
-        },
+        }
         ["WRITE", value] => {
             let t_value = TagValue::I32(i32::from_str_radix(value, 10).unwrap());
             let result = tag.write(t_value).await;
             let json = serde_json::to_string(&result).unwrap();
             send_message(&client, &topic_to_sent, &json).unwrap();
             println!("WRITE VALUE: {} COMMAND", value);
-        },
+        }
         _ => {
             println!("Invalid Command!");
-        },
+        }
     };
 }
 
@@ -137,14 +138,21 @@ pub fn connect_broker_subscribing_to_commands(
     let (mqtt_client, mqtt_worker) = MqttClientBuilder::new(url)
         .subscribe(topic_subscribe, qos)
         .build();
-    
-        let callback_mqtt_client = mqtt_client.clone();
-        mqtt_client.set_on_message_callback(move |msg: &Message| {
-            let msg_owned = msg.clone();
-            tokio::spawn(process_recv_mqtt_command(callback_mqtt_client.clone(), msg_owned, tags.clone()));
+
+    let callback_mqtt_client = mqtt_client.clone();
+    mqtt_client.set_on_message_callback(move |msg: &Message| {
+        let msg_owned = msg.clone();
+        tokio::spawn(process_recv_mqtt_command(
+            callback_mqtt_client.clone(),
+            msg_owned,
+            tags.clone(),
+        ));
     });
 
     tokio::spawn(mqtt_worker.run());
 
-    Ok((mqtt_client.clone(), mqtt_config.mqtt_topic_installation_prefix))
+    Ok((
+        mqtt_client.clone(),
+        mqtt_config.mqtt_topic_installation_prefix,
+    ))
 }

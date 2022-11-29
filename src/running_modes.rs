@@ -1,9 +1,9 @@
 use crate::cloud_protocols::mqtt::{connect_broker_subscribing_to_commands, send_message};
 use crate::models::tag::TTag;
+use serde_json;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use serde_json;
 
 pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
     let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands(tags.clone())

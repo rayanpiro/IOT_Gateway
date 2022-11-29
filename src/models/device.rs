@@ -1,7 +1,7 @@
 use super::tag::{TagResponse, TagValue};
 use async_trait::async_trait;
-use std::fmt::Debug;
 use serde::Serialize;
+use std::fmt::Debug;
 
 #[async_trait]
 pub trait THardDevice<C, T> {
