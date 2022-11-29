@@ -3,3 +3,4 @@
 /modbus_rtu
 Cargo.lock
 *.ini
+.vscode/launch.json
