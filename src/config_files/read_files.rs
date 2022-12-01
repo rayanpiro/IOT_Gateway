@@ -3,7 +3,7 @@ use crate::cloud_protocols::mqtt::MqttIniConfig;
 use crate::device_protocols::modbus;
 use crate::models::{
     device::THardDevice,
-    tag::{TTag, Named, TagId},
+    tag::{Named, TTag, TagId},
 };
 use std::sync::Arc;
 use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData};

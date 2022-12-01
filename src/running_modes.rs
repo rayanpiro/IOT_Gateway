@@ -26,12 +26,7 @@ pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
                 let base_topic = base_topic.clone();
 
                 async move {
-                    let topic = &format!(
-                        "{}/{}/{}",
-                        &base_topic,
-                        t.device_name(),
-                        t.tag().name()
-                    );
+                    let topic = &format!("{}/{}/{}", &base_topic, t.device_name(), t.tag().name());
 
                     let value = t.read().await;
                     let json = serde_json::to_string(&value).unwrap();

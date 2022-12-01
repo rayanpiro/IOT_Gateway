@@ -57,7 +57,7 @@ impl Named for Tag {
 #[derive(Debug, Clone)]
 pub struct Device(Connection);
 
-use crate::models::device::{ReadError, THardDevice, WriteError, ReadFrequency};
+use crate::models::device::{ReadError, ReadFrequency, THardDevice, WriteError};
 use crate::models::tag::{Named, TagResponse, TagValue};
 
 #[derive(Debug, Clone)]

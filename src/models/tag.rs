@@ -1,7 +1,7 @@
 use serde::Serialize;
-use std::{marker::PhantomData, str::FromStr};
+use std::marker::PhantomData;
 
-use super::device::{ReadError, THardDevice, WriteError, ReadFrequency};
+use super::device::{ReadError, ReadFrequency, THardDevice, WriteError};
 use async_trait::async_trait;
 
 const TAG_REQUEST_SECONDS_TO_TIMEOUT: u64 = 4;
