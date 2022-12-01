@@ -14,7 +14,7 @@ pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
 
     let sched = JobScheduler::new().await.unwrap();
     for t in tags.iter() {
-        let seconds = t.get_tag().get_freq().to_seconds();
+        let seconds = t.freq().await.to_seconds();
         let t = t.clone();
         let mqtt_client = mqtt_client.clone();
         let base_topic = base_topic.clone();
@@ -29,8 +29,8 @@ pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
                     let topic = &format!(
                         "{}/{}/{}",
                         &base_topic,
-                        t.get_device_name(),
-                        t.get_tag().get_name()
+                        t.device_name(),
+                        t.tag().name()
                     );
 
                     let value = t.read().await;
@@ -55,7 +55,7 @@ pub async fn tag_one_shot_read(
 
     let mut retries = retries;
 
-    let tag = tags.iter().find(|t| t.get_tag().get_name() == tag_to_read);
+    let tag = tags.iter().find(|t| t.tag().name() == tag_to_read);
 
     if tag.is_none() {
         return error_msg;

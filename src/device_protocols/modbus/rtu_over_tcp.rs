@@ -30,55 +30,51 @@ gen_matcher!(
 );
 
 gen_readable_struct!(
-    struct ModbusRtuOverTCPConnection {
+    struct Connection {
         name: String,
         ip: std::net::IpAddr,
         port: u16,
+        slave: u8,
+        read_freq: ReadFrequency,
     }
 );
 
 gen_readable_struct!(
-    struct ModbusRtuTag {
+    struct Tag {
         name: String,
-        slave: u8,
         address: u16,
         length: u16,
         command: Command,
         swap: Swap,
         data_type: Type,
-        read_freq: TagReadFrequency,
         multiplier: f32,
     }
 );
 
-impl TValidTag for ModbusRtuTag {
-    fn get_name(&self) -> &str {
+impl Named for Tag {
+    fn name(&self) -> &str {
         &self.name
-    }
-
-    fn get_freq(&self) -> &TagReadFrequency {
-        &self.read_freq
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ModbusRtuOverTCPDevice(pub ModbusRtuOverTCPConnection);
+pub struct Device(Connection);
 
-use crate::models::device::{ReadError, THardDevice, WriteError};
-use crate::models::tag::{TValidTag, TagReadFrequency, TagResponse, TagValue};
+use crate::models::device::{ReadError, THardDevice, WriteError, ReadFrequency};
+use crate::models::tag::{Named, TagResponse, TagValue};
 
 #[derive(Debug, Clone)]
-struct ModbusRtuError(String);
+struct Error(String);
 
-impl ModbusRtuOverTCPDevice {
-    async fn connect(&self, slave: Slave) -> Result<Context, ModbusRtuError> {
+impl Device {
+    async fn connect(&self, slave: Slave) -> Result<Context, Error> {
         let ethernet_gateway = tokio::net::TcpStream::connect((self.0.ip, self.0.port))
             .await
-            .map_err(|err| ModbusRtuError(err.to_string()))?;
+            .map_err(|err| Error(err.to_string()))?;
 
         match rtu::connect_slave(ethernet_gateway, slave).await {
             Ok(ctx) => Ok(ctx),
-            Err(err) => Err(ModbusRtuError(err.to_string())),
+            Err(err) => Err(Error(err.to_string())),
         }
     }
 }
@@ -86,18 +82,22 @@ impl ModbusRtuOverTCPDevice {
 use async_trait::async_trait;
 
 #[async_trait]
-impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPDevice {
-    fn new(connection: ModbusRtuOverTCPConnection) -> Self {
-        ModbusRtuOverTCPDevice(connection)
+impl THardDevice<Connection, Tag> for Device {
+    fn new(connection: Connection) -> Self {
+        Device(connection)
+    }
+
+    fn get_freq(&self) -> &ReadFrequency {
+        &self.0.read_freq
     }
 
     fn get_device_name(&self) -> String {
         self.0.name.clone()
     }
 
-    async fn read(&self, tag: &ModbusRtuTag) -> Result<TagResponse, ReadError> {
+    async fn read(&self, tag: &Tag) -> Result<TagResponse, ReadError> {
         let mut ctx = self
-            .connect(Slave(tag.slave))
+            .connect(Slave(self.0.slave))
             .await
             .map_err(|err| ReadError(err.0))?;
 
@@ -135,9 +135,9 @@ impl THardDevice<ModbusRtuOverTCPConnection, ModbusRtuTag> for ModbusRtuOverTCPD
         })
     }
 
-    async fn write(&self, tag: &ModbusRtuTag, value: TagValue) -> Result<(), WriteError> {
+    async fn write(&self, tag: &Tag, value: TagValue) -> Result<(), WriteError> {
         let mut ctx = self
-            .connect(Slave(tag.slave))
+            .connect(Slave(self.0.slave))
             .await
             .map_err(|err| WriteError(err.0))?;
 
@@ -212,7 +212,7 @@ fn from_coil_to_word<'a>(
     })
 }
 
-fn parse_readed(data: Vec<u16>, tag: &ModbusRtuTag) -> TagValue {
+fn parse_readed(data: Vec<u16>, tag: &Tag) -> TagValue {
     let data: Vec<u16> = match tag.swap {
         Swap::LittleEndian => data.iter().map(swap_bytes).rev().collect(),
         Swap::BigEndian => data,
@@ -284,18 +284,15 @@ mod tests {
 
     #[test]
     fn test_parse_readed() {
-        use super::{parse_readed, Command, ModbusRtuTag, Swap, TagValue, Type};
-        use crate::models::tag::TagReadFrequency;
+        use super::{parse_readed, Command, Swap, Tag, TagValue, Type};
 
-        let mut tag = ModbusRtuTag {
+        let mut tag = Tag {
             name: String::from("TEST"),
             address: 10,
             command: Command::Holding,
             data_type: Type::Integer,
             length: 1,
             multiplier: 0.1,
-            read_freq: TagReadFrequency::Seconds(1),
-            slave: 10,
             swap: Swap::BigEndian,
         };
 

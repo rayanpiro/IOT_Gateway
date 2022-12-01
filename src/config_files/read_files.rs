@@ -1,22 +1,15 @@
+use super::ini_parser;
 use crate::cloud_protocols::mqtt::MqttIniConfig;
-use crate::device_protocols::modbus_rtu::{
-    ModbusRtuOverTCPConnection, ModbusRtuOverTCPDevice, ModbusRtuTag,
-};
-
-use crate::device_protocols::modbus_tcp::{ModbusTcpConnection, ModbusTcpDevice, ModbusTcpTag};
+use crate::device_protocols::modbus;
 use crate::models::{
     device::THardDevice,
-    tag::{TTag, TValidTag, TagId},
+    tag::{TTag, Named, TagId},
 };
-
-use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData};
-
 use std::sync::Arc;
+use std::{collections::HashMap, fmt::Debug, fs, marker::PhantomData};
 use tokio::sync::Mutex;
 
-use super::ini_parser;
-
-const INI_PROTOCOL_FOLDERS: [&str; 2] = ["modbus_tcp/", "modbus_rtu/"];
+const INI_PROTOCOL_FOLDERS: [&str; 2] = ["modbus_tcp/", "modbus_rtu_over_tcp/"];
 
 pub fn get_mqtt_config() -> MqttIniConfig {
     ini_parser::read_file::<MqttIniConfig>("mqtt.ini")
@@ -36,14 +29,14 @@ pub fn get_tags_from_ini_files() -> Vec<Arc<dyn TTag>> {
 
             match protocol {
                 "modbus_tcp" => tags.append(&mut read_tags::<
-                    ModbusTcpDevice,
-                    ModbusTcpConnection,
-                    ModbusTcpTag,
+                    modbus::tcp::Device,
+                    modbus::tcp::Connection,
+                    modbus::tcp::Tag,
                 >(&path)),
-                "modbus_rtu" => tags.append(&mut read_tags::<
-                    ModbusRtuOverTCPDevice,
-                    ModbusRtuOverTCPConnection,
-                    ModbusRtuTag,
+                "modbus_rtu_over_tcp" => tags.append(&mut read_tags::<
+                    modbus::rtu_over_tcp::Device,
+                    modbus::rtu_over_tcp::Connection,
+                    modbus::rtu_over_tcp::Tag,
                 >(&path)),
                 _ => unimplemented!(),
             }
@@ -58,7 +51,7 @@ where
     T: THardDevice<C, S> + Clone + Send + Sync + 'static,
     C: TryFrom<HashMap<String, String>> + Debug + Clone + Send + Sync + 'static,
     <C as TryFrom<HashMap<String, String>>>::Error: Debug,
-    S: TValidTag + TryFrom<HashMap<String, String>> + Debug + Clone + Send + Sync + 'static,
+    S: Named + TryFrom<HashMap<String, String>> + Debug + Clone + Send + Sync + 'static,
     <S as TryFrom<HashMap<String, String>>>::Error: Debug,
 {
     let path = path.to_string();

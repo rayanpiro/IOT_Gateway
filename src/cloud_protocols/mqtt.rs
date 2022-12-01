@@ -77,7 +77,7 @@ async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<A
 
     let splitted_payload = payload.split(" ").collect::<Vec<&str>>();
     let tag = tags.into_iter().find(|t| {
-        let t_name = format!("{}/{}", t.get_device_name(), t.get_tag().get_name());
+        let t_name = format!("{}/{}", t.device_name(), t.tag().name());
         t_name == recv_tag_name
     });
 
