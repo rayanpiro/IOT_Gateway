@@ -145,8 +145,5 @@ pub fn connect_broker_subscribing_to_commands(
 
     tokio::spawn(mqtt_worker.run());
 
-    Ok((
-        mqtt_client,
-        mqtt_config.mqtt_topic_installation_prefix,
-    ))
+    Ok((mqtt_client, mqtt_config.mqtt_topic_installation_prefix))
 }
