@@ -22,7 +22,12 @@ macro_rules! get_config_folders {
                 for folder in $e_name::config_folders() {
                     for device in std::fs::read_dir(folder).unwrap_or_else(|_| panic!("The folder {} cannot be found.", folder)) {
                         let protocol = &folder[..folder.len()];
-                        let path = device.unwrap().path().to_str().unwrap().to_string();
+
+                        let device_folder = device.unwrap().path();
+                        if !device_folder.is_dir() {
+                            continue;
+                        }
+                        let path = device_folder.to_str().unwrap().to_string();
 
                         match protocol {
                             $( $config_folder => {
