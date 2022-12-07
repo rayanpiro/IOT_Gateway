@@ -1,67 +1,103 @@
-use crate::cloud_protocols::mqtt::{connect_broker_subscribing_to_commands, send_message};
-use crate::models::tag::TTag;
+use crate::cloud_protocols::mqtt::MqttError;
+use crate::models::device::ReadError;
+use crate::models::tag::TagResponse;
+use crate::DeviceProtocols;
+use futures::future::join_all;
 use serde_json;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 
-pub async fn daemon_mode(tags: Vec<Arc<dyn TTag>>) {
-    let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands(tags.clone())
-        .expect("There is a problem initializing Mqtt Conection");
+const TAG_REQUEST_SECONDS_TO_TIMEOUT: u64 = 4;
 
-    let mqtt_client = Arc::new(mqtt_client);
-    let base_topic = Arc::new(base_topic);
+async fn job_function(tags_to_read: Vec<DeviceProtocols>) -> String {
+    let futures = tags_to_read.iter().map(|dev| {
+        tokio::time::timeout(Duration::new(TAG_REQUEST_SECONDS_TO_TIMEOUT, 0), dev.read())
+    });
+    let values: Vec<Result<TagResponse, ReadError>> = join_all(futures)
+        .await
+        .into_iter()
+        .map(|res| -> Result<TagResponse, ReadError> {
+            match res {
+                Ok(val) => match val {
+                    Ok(val) => Ok(val),
+                    Err(err) => Err(err),
+                },
+                Err(err) => Err(ReadError(err.to_string())),
+            }
+        })
+        .collect();
+    serde_json::to_string(&values).unwrap()
+}
+
+pub async fn daemon_mode<F>(devices: Arc<Vec<DeviceProtocols>>, send_f: F) -> !
+where
+    F: Fn(String, String) -> Result<(), MqttError> + Send + Sync + Clone + 'static,
+{
+    let set_of_connections: HashSet<String> =
+        HashSet::from_iter(devices.iter().map(|d| d.device_name()));
 
     let sched = JobScheduler::new().await.unwrap();
-    for t in tags.iter() {
-        let seconds = t.freq().await.to_seconds();
-        let t = t.clone();
-        let mqtt_client = mqtt_client.clone();
-        let base_topic = base_topic.clone();
 
+    for connection_name in set_of_connections.iter() {
+        let tags_to_read: Vec<DeviceProtocols> = devices
+            .iter()
+            .filter_map(|dev| {
+                if dev.device_name() != *connection_name {
+                    return None;
+                }
+                Some(dev.to_owned())
+            })
+            .collect();
+
+        let first_device = tags_to_read.get(0).unwrap();
+        let (seconds, device_name) = (first_device.freq().to_seconds(), first_device.device_name());
+
+        let device_name = device_name.clone();
+        let tags_to_read = tags_to_read.clone();
+        let send_f = send_f.clone();
         let job = Job::new_repeated_async(Duration::from_secs(seconds), move |_uuid, _l| {
+            let device_name = device_name.clone();
+            let tags_to_read = tags_to_read.clone();
+            let send_f = send_f.clone();
             Box::pin({
-                let t = t.clone();
-                let mqtt_client = mqtt_client.clone();
-                let base_topic = base_topic.clone();
-
                 async move {
-                    let topic = &format!("{}/{}/{}", &base_topic, t.device_name(), t.tag().name());
-
-                    let value = t.read().await;
-                    let json = serde_json::to_string(&value).unwrap();
-                    send_message(&mqtt_client, topic, &json).unwrap();
+                    let json = job_function(tags_to_read).await;
+                    send_f(device_name, json).unwrap();
                 }
             })
-        })
-        .unwrap();
-        sched.add(job).await.unwrap();
+        });
+        sched.add(job.unwrap()).await.unwrap();
     }
-
-    while sched.start().await.unwrap().await.is_err() {}
+    loop {
+        sched
+            .start()
+            .await
+            .unwrap()
+            .await
+            .expect("There was an issue on the job sched.");
+    }
 }
 
 pub async fn tag_one_shot_read(
-    tags: Vec<Arc<dyn TTag>>,
+    devices: Arc<Vec<DeviceProtocols>>,
     tag_to_read: &str,
     retries: u32,
 ) -> String {
     let error_msg: String = "Error".to_string();
 
-    let mut retries = retries;
+    let device = devices.iter().find(|dev| &dev.tag_name() == &tag_to_read);
 
-    let tag = tags.iter().find(|t| t.tag().name() == tag_to_read);
+    if let Some(device) = device {
+        let mut retries = retries;
 
-    if tag.is_none() {
-        return error_msg;
-    }
-
-    while retries > 0 {
-        if let Ok(x) = tag.unwrap().read().await {
-            return x.value.to_string();
+        while retries > 0 {
+            if let Ok(x) = device.read().await {
+                return x.value.to_string();
+            }
+            retries -= 1;
         }
-        retries -= 1;
     }
-
     error_msg
 }

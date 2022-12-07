@@ -4,10 +4,13 @@ mod device_protocols;
 mod models;
 mod running_modes;
 
-use config_files::read_files::get_tags_from_ini_files;
-use running_modes::{daemon_mode, tag_one_shot_read};
-
 use clap::Parser;
+use cloud_protocols::mqtt::{connect_broker_subscribing_to_commands, send_message};
+use device_protocols::DeviceProtocols;
+use running_modes::{daemon_mode, tag_one_shot_read};
+use std::sync::Arc;
+use tokio;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -20,15 +23,21 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let tags = get_tags_from_ini_files();
+    let devices = Arc::new(DeviceProtocols::from_ini_files());
     let arguments = Args::parse();
-    if arguments.tag_name.is_some() {
-        let return_value =
-            tag_one_shot_read(tags, &arguments.tag_name.unwrap(), arguments.retry).await;
+
+    if let Some(tag_name) = arguments.tag_name {
+        let return_value = tag_one_shot_read(devices, &tag_name, arguments.retry).await;
         print!("{}", return_value);
     } else {
-        daemon_mode(tags).await;
-    }
+        let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands(devices.clone())
+            .expect("There is a problem initializing Mqtt Conection");
 
+        let sender = move |name: String, msg: String| {
+            let topic = format!("{}/{}", base_topic, name);
+            send_message(&mqtt_client, &topic, msg.as_ref())
+        };
+        daemon_mode(devices, sender).await;
+    }
     Ok(())
 }

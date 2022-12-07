@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use crate::config_files::read_files::get_mqtt_config;
-use crate::models::tag::{TTag, TagValue};
+use super::get_mqtt_config;
+use crate::device_protocols::DeviceProtocols;
+use crate::models::tag::TagValue;
 use crate::{gen_matcher, gen_readable_struct};
 use gmqtt_client::{Message, MqttClient, MqttClientBuilder, QoS};
 use serde_json;
@@ -63,34 +64,27 @@ impl std::fmt::Display for MqttError {
     }
 }
 
-async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<Arc<dyn TTag>>) {
+async fn process_recv_mqtt_command(
+    client: MqttClient,
+    msg: Message,
+    devices: Arc<Vec<DeviceProtocols>>,
+) {
     let payload = msg.payload_str().into_owned();
-    let recv_tag_name = msg
-        .topic()
-        .rsplit("/")
-        .collect::<Vec<&str>>()
-        .into_iter()
-        .take(2)
-        .rev()
-        .collect::<Vec<&str>>()
-        .join("/");
+    let recv_tag_name = msg.topic().rsplit("/").next().unwrap();
 
     let splitted_payload = payload.split(" ").collect::<Vec<&str>>();
-    let tag = tags.into_iter().find(|t| {
-        let t_name = format!("{}/{}", t.device_name(), t.tag().name());
-        t_name == recv_tag_name
-    });
+    let dev = devices.iter().find(|d| d.tag_name() == recv_tag_name);
 
-    if tag.is_none() {
+    if dev.is_none() {
         return;
     }
 
-    let tag = tag.unwrap();
+    let dev = dev.unwrap();
     let topic_to_sent = msg.topic().replace("/commands", "");
 
     match splitted_payload.as_slice() {
         ["PING"] => {
-            let result = tag.read().await;
+            let result = dev.read().await;
             if result.is_ok() {
                 send_message(&client, &topic_to_sent, "PONG").unwrap();
             } else {
@@ -98,13 +92,13 @@ async fn process_recv_mqtt_command(client: MqttClient, msg: Message, tags: Vec<A
             }
         }
         ["READ"] => {
-            let result = tag.read().await;
+            let result = dev.read().await;
             let json = serde_json::to_string(&result).unwrap();
             send_message(&client, &topic_to_sent, &json).unwrap();
         }
         ["WRITE", value] => {
             let t_value = TagValue::I32(i32::from_str_radix(value, 10).unwrap());
-            let result = tag.write(t_value).await;
+            let result = dev.write(t_value).await;
             let json = serde_json::to_string(&result).unwrap();
             send_message(&client, &topic_to_sent, &json).unwrap();
             println!("WRITE VALUE: {} COMMAND", value);
@@ -124,7 +118,7 @@ pub fn send_message(client: &MqttClient, topic: &str, msg: &str) -> Result<(), M
 }
 
 pub fn connect_broker_subscribing_to_commands(
-    tags: Vec<Arc<dyn TTag>>,
+    devices: Arc<Vec<DeviceProtocols>>,
 ) -> Result<(MqttClient, String), MqttError> {
     let mqtt_config = get_mqtt_config();
 
@@ -145,7 +139,7 @@ pub fn connect_broker_subscribing_to_commands(
         tokio::spawn(process_recv_mqtt_command(
             callback_mqtt_client.clone(),
             msg_owned,
-            tags.clone(),
+            devices.clone(),
         ));
     });
 

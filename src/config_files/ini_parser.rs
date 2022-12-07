@@ -71,7 +71,7 @@ macro_rules! gen_readable_struct {
 
         #[derive(Debug, Clone)]
         pub struct $s_name {
-            pub $( $field: $type ),*
+            $(pub $field: $type ),*
         }
 
         impl TryFrom<std::collections::HashMap<String, String>> for $s_name {
