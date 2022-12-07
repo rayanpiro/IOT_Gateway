@@ -135,11 +135,10 @@ pub fn connect_broker_subscribing_to_commands(
 
     let callback_mqtt_client = mqtt_client.clone();
     mqtt_client.set_on_message_callback(move |msg: &Message| {
-        let msg_owned = msg.clone();
         tokio::spawn(process_recv_mqtt_command(
-            callback_mqtt_client.clone(),
-            msg_owned,
-            devices.clone(),
+            callback_mqtt_client.to_owned(),
+            msg.to_owned(),
+            devices.to_owned(),
         ));
     });
 
