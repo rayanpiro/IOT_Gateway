@@ -92,7 +92,12 @@ pub async fn tag_one_shot_read(
         let mut retries = retries;
 
         while retries > 0 {
-            if let Ok(x) = device.read().await {
+            if let Ok(Ok(x)) = tokio::time::timeout(
+                Duration::new(TAG_REQUEST_SECONDS_TO_TIMEOUT, 0),
+                device.read(),
+            )
+            .await
+            {
                 return x.value.to_string();
             }
             retries -= 1;
