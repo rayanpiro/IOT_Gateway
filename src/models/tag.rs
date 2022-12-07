@@ -22,13 +22,3 @@ impl ToString for TagValue {
         }
     }
 }
-
-pub trait Named: Send + Sync {
-    fn name(&self) -> &str;
-}
-
-pub trait Introspection: Send + Sync {
-    fn get_self(&self) -> &Self {
-        &self
-    }
-}

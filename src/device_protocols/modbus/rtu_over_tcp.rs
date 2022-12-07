@@ -48,7 +48,7 @@ where
     ));
 
     for device_folder in
-        std::fs::read_dir(&path).unwrap_or_else(|_| panic!("The folder {} cannot be found.", &path))
+        std::fs::read_dir(path).unwrap_or_else(|_| panic!("The folder {} cannot be found.", &path))
     {
         let device_folder = device_folder.unwrap().path();
         if !device_folder.is_dir() {

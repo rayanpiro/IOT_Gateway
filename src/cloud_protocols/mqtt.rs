@@ -70,9 +70,9 @@ async fn process_recv_mqtt_command(
     devices: Arc<Vec<DeviceProtocols>>,
 ) {
     let payload = msg.payload_str().into_owned();
-    let recv_tag_name = msg.topic().rsplit("/").next().unwrap();
+    let recv_tag_name = msg.topic().rsplit('/').next().unwrap();
 
-    let splitted_payload = payload.split(" ").collect::<Vec<&str>>();
+    let splitted_payload = payload.split(' ').collect::<Vec<&str>>();
     let dev = devices.iter().find(|d| d.tag_name() == recv_tag_name);
 
     if dev.is_none() {
@@ -97,7 +97,7 @@ async fn process_recv_mqtt_command(
             send_message(&client, &topic_to_sent, &json).unwrap();
         }
         ["WRITE", value] => {
-            let t_value = TagValue::I32(i32::from_str_radix(value, 10).unwrap());
+            let t_value = TagValue::I32(value.parse().unwrap());
             let result = dev.write(t_value).await;
             let json = serde_json::to_string(&result).unwrap();
             send_message(&client, &topic_to_sent, &json).unwrap();
@@ -146,7 +146,7 @@ pub fn connect_broker_subscribing_to_commands(
     tokio::spawn(mqtt_worker.run());
 
     Ok((
-        mqtt_client.clone(),
+        mqtt_client,
         mqtt_config.mqtt_topic_installation_prefix,
     ))
 }

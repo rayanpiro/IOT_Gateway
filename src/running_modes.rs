@@ -3,7 +3,6 @@ use crate::models::device::ReadError;
 use crate::models::tag::TagResponse;
 use crate::DeviceProtocols;
 use futures::future::join_all;
-use serde_json;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -87,7 +86,7 @@ pub async fn tag_one_shot_read(
 ) -> String {
     let error_msg: String = "Error".to_string();
 
-    let device = devices.iter().find(|dev| &dev.tag_name() == &tag_to_read);
+    let device = devices.iter().find(|dev| dev.tag_name() == tag_to_read);
 
     if let Some(device) = device {
         let mut retries = retries;

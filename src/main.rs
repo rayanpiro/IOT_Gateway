@@ -9,7 +9,6 @@ use cloud_protocols::mqtt::{connect_broker_subscribing_to_commands, send_message
 use device_protocols::DeviceProtocols;
 use running_modes::{daemon_mode, tag_one_shot_read};
 use std::sync::Arc;
-use tokio;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
