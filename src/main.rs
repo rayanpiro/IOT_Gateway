@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (mqtt_client, base_topic) = connect_broker_subscribing_to_commands(devices.clone())
             .expect("There is a problem initializing Mqtt Conection");
 
-        let sender = move |name: String, msg: String| {
+        let sender = move |name: &str, msg: &str| {
             let topic = format!("{}/{}", base_topic, name);
             send_message(&mqtt_client, &topic, msg.as_ref())
         };

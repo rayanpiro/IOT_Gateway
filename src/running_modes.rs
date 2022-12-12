@@ -10,7 +10,7 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 
 const TAG_REQUEST_SECONDS_TO_TIMEOUT: u64 = 4;
 
-async fn job_function(tags_to_read: Vec<DeviceProtocols>) -> String {
+async fn job_function(tags_to_read: &Vec<DeviceProtocols>) -> String {
     let futures = tags_to_read.iter().map(|dev| {
         tokio::time::timeout(Duration::new(TAG_REQUEST_SECONDS_TO_TIMEOUT, 0), dev.read())
     });
@@ -32,7 +32,7 @@ async fn job_function(tags_to_read: Vec<DeviceProtocols>) -> String {
 
 pub async fn daemon_mode<F>(devices: Arc<Vec<DeviceProtocols>>, send_f: F) -> !
 where
-    F: Fn(String, String) -> Result<(), MqttError> + Send + Sync + Clone + 'static,
+    F: Fn(&str, &str) -> Result<(), MqttError> + Send + Sync + Clone + 'static,
 {
     let set_of_connections: HashSet<String> =
         HashSet::from_iter(devices.iter().map(|d| d.device_name()));
@@ -52,16 +52,16 @@ where
 
         let first_device = tags_to_read.get(0).unwrap();
         let (seconds, device_name) = (first_device.freq().to_seconds(), first_device.device_name());
-
         let send_f = send_f.to_owned();
+
         let job = Job::new_repeated_async(Duration::from_secs(seconds), move |_uuid, _l| {
             let device_name = device_name.to_owned();
             let tags_to_read = tags_to_read.to_owned();
-            let send_f = send_f.to_owned();
+            let send_f = (&send_f).to_owned();
             Box::pin(
                 async move {
-                    let json = job_function(tags_to_read.to_owned()).await;
-                    send_f(device_name.to_owned(), json).unwrap();
+                    let json = job_function(&tags_to_read).await;
+                    send_f(&device_name, &json).unwrap();
             })
         });
         sched.add(job.unwrap()).await.unwrap();
