@@ -77,24 +77,16 @@ pub async fn read(con: &Connection, tag: &Tag) -> Result<TagResponse, ReadError>
 pub async fn write(con: &Connection, tag: &Tag, value: TagValue) -> Result<(), WriteError> {
     let mut ctx = connect(con).await.map_err(|err| WriteError(err.0))?;
 
-    let tag_to_write = tag;
-
     let value_to_write = match value {
-        TagValue::F32(x) => {
-            let scaled_value: f32 = x;
-            scaled_value.to_be_bytes()
-        }
-        TagValue::I32(x) => {
-            let scaled_value = x;
-            scaled_value.to_be_bytes()
-        }
+        TagValue::F32(val) => val.to_le_bytes(),
+        TagValue::I32(val) => val.to_le_bytes(),
     };
 
     dbg!(value_to_write);
 
-    match tag_to_write.command {
+    match tag.command {
         shared::Command::Coil => {
-            ctx.write_single_coil(tag_to_write.address, value_to_write.iter().sum::<u8>() != 0)
+            ctx.write_single_coil(tag.address, value_to_write.iter().sum::<u8>() != 0)
                 .await
         }
         shared::Command::Discrete => unimplemented!("A discrete register cannot be written."),
@@ -107,7 +99,7 @@ pub async fn write(con: &Connection, tag: &Tag, value: TagValue) -> Result<(), W
                 })
                 .collect();
 
-            ctx.write_multiple_registers(tag_to_write.address, &value)
+            ctx.write_multiple_registers(tag.address, &value)
                 .await
         }
         shared::Command::Input => unimplemented!("An input register cannot be written."),

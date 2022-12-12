@@ -123,14 +123,8 @@ pub async fn write(
     let mut ctx = connect(gw, con).await.map_err(|err| WriteError(err.0))?;
 
     let value_to_write = match value {
-        TagValue::F32(x) => {
-            let scaled_value: f32 = x / tag.multiplier;
-            scaled_value.to_be_bytes()
-        }
-        TagValue::I32(x) => {
-            let scaled_value: f32 = (x as f32) / tag.multiplier;
-            scaled_value.to_be_bytes()
-        }
+        TagValue::F32(val) => val.to_le_bytes(),
+        TagValue::I32(val) => val.to_le_bytes(),
     };
 
     dbg!(value_to_write);
