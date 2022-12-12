@@ -99,8 +99,7 @@ pub async fn write(con: &Connection, tag: &Tag, value: TagValue) -> Result<(), W
                 })
                 .collect();
 
-            ctx.write_multiple_registers(tag.address, &value)
-                .await
+            ctx.write_multiple_registers(tag.address, &value).await
         }
         shared::Command::Input => unimplemented!("An input register cannot be written."),
     }

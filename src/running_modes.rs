@@ -58,10 +58,9 @@ where
             let device_name = device_name.to_owned();
             let tags_to_read = tags_to_read.to_owned();
             let send_f = (&send_f).to_owned();
-            Box::pin(
-                async move {
-                    let json = job_function(&tags_to_read).await;
-                    send_f(&device_name, &json).unwrap();
+            Box::pin(async move {
+                let json = job_function(&tags_to_read).await;
+                send_f(&device_name, &json).unwrap();
             })
         });
         sched.add(job.unwrap()).await.unwrap();
