@@ -43,7 +43,7 @@ where
 #[macro_export]
 macro_rules! gen_matcher {
     (enum $e_name:ident { $( $field:ident ),*, }) => {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub enum $e_name {
             $(
                 $field,

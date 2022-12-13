@@ -1,4 +1,5 @@
 use crate::cloud_protocols::mqtt::MqttError;
+use crate::device_protocols::Mode;
 use crate::models::device::ReadError;
 use crate::models::tag::TagResponse;
 use crate::DeviceProtocols;
@@ -43,7 +44,7 @@ where
         let tags_to_read: Vec<DeviceProtocols> = devices
             .iter()
             .filter_map(|dev| {
-                if dev.device_name() != *connection_name {
+                if dev.device_name() != *connection_name || dev.mode() != Mode::Read {
                     return None;
                 }
                 Some(dev.to_owned())

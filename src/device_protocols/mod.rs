@@ -1,6 +1,9 @@
-use crate::models::{
-    device::{ReadError, ReadFrequency, WriteError},
-    tag::{TagResponse, TagValue},
+use crate::{
+    gen_matcher,
+    models::{
+        device::{ReadError, ReadFrequency, WriteError},
+        tag::{TagResponse, TagValue},
+    },
 };
 
 pub mod modbus;
@@ -44,6 +47,13 @@ macro_rules! get_config_folders {
     };
 }
 
+gen_matcher!(
+    enum Mode {
+        Read,
+        Write,
+    }
+);
+
 use std::sync::Arc;
 use tokio::sync::Mutex;
 get_config_folders!(
@@ -84,6 +94,13 @@ impl DeviceProtocols {
         match self {
             DeviceProtocols::ModbusRTUOverTCP(_, c, _) => c.name.to_owned(),
             DeviceProtocols::ModbusTCP(c, _) => c.name.to_owned(),
+        }
+    }
+
+    pub fn mode(&self) -> Mode {
+        match self {
+            DeviceProtocols::ModbusRTUOverTCP(_, _, t) => t.mode.to_owned(),
+            DeviceProtocols::ModbusTCP(_, t) => t.mode.to_owned(),
         }
     }
 
