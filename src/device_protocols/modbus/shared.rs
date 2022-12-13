@@ -1,7 +1,8 @@
+use crate::models::device::WriteError;
 use crate::models::tag::TagValue;
 use crate::{gen_matcher, models::device::ReadError};
 use tokio_modbus::client::Context;
-use tokio_modbus::prelude::Reader;
+use tokio_modbus::prelude::{Reader, Writer};
 
 gen_matcher!(
     enum Swap {
@@ -27,6 +28,32 @@ gen_matcher!(
         Input,
     }
 );
+
+pub async fn write(
+    ctx: &mut Context,
+    command: &Command,
+    address: u16,
+    value_to_write: &[u16],
+) -> Result<(), WriteError>
+where
+    Context: Writer,
+{
+    match command {
+        Command::Coil => {
+            ctx.write_single_coil(address, from_byte_slice_to_coil(&value_to_write))
+                .await
+        }
+        Command::Discrete => unimplemented!("A discrete register cannot be written."),
+        Command::Holding => ctx.write_multiple_registers(address, &value_to_write).await,
+        Command::Input => unimplemented!("An input register cannot be written."),
+    }
+    .map_err(|err| WriteError(err.to_string()))?;
+
+    ctx.disconnect()
+        .await
+        .map_err(|err| WriteError(err.to_string()))?;
+    Ok(())
+}
 
 pub async fn read(
     ctx: &mut Context,
@@ -71,6 +98,21 @@ fn from_coil_to_word<'a>(
     })
 }
 
+pub fn parse_write(data: &TagValue, swap: &Swap) -> Vec<u16> {
+    let data = match data {
+        TagValue::F32(val) => val.to_be_bytes(),
+        TagValue::I32(val) => val.to_be_bytes(),
+    };
+    let data = data.map(|b| b as u16).to_vec();
+
+    match swap {
+        Swap::LittleEndian => data.iter().map(swap_bytes).rev().collect(),
+        Swap::BigEndian => data,
+        Swap::LittleEndianSwap => swap_words(data.iter().map(swap_bytes).rev().collect()),
+        Swap::BigEndianSwap => swap_words(data),
+    }
+}
+
 pub fn parse_readed(data: Vec<u16>, swap: &Swap, data_type: &Type, multiplier: &f32) -> TagValue {
     let data: Vec<u16> = match swap {
         Swap::LittleEndian => data.iter().map(swap_bytes).rev().collect(),
@@ -97,6 +139,10 @@ pub fn parse_readed(data: Vec<u16>, swap: &Swap, data_type: &Type, multiplier: &
         true => TagValue::I32(scaled_value as i32),
         false => TagValue::F32(scaled_value),
     }
+}
+
+pub fn from_byte_slice_to_coil(bytes: &[u16]) -> bool {
+    bytes.iter().sum::<u16>() != 0
 }
 
 fn is_integer(value: f32) -> bool {

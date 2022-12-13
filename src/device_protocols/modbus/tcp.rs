@@ -20,6 +20,7 @@ gen_readable_struct!(
         command: shared::Command,
         swap: shared::Swap,
         data_type: shared::Type,
+        mode: super::super::Mode,
         multiplier: f32,
     }
 );
@@ -77,37 +78,8 @@ pub async fn read(con: &Connection, tag: &Tag) -> Result<TagResponse, ReadError>
 pub async fn write(con: &Connection, tag: &Tag, value: TagValue) -> Result<(), WriteError> {
     let mut ctx = connect(con).await.map_err(|err| WriteError(err.0))?;
 
-    let value_to_write = match value {
-        TagValue::F32(val) => val.to_le_bytes(),
-        TagValue::I32(val) => val.to_le_bytes(),
-    };
-
-    dbg!(value_to_write);
-
-    match tag.command {
-        shared::Command::Coil => {
-            ctx.write_single_coil(tag.address, value_to_write.iter().sum::<u8>() != 0)
-                .await
-        }
-        shared::Command::Discrete => unimplemented!("A discrete register cannot be written."),
-        shared::Command::Holding => {
-            let value: Vec<u16> = value_to_write
-                .windows(2)
-                .map(|pair| {
-                    let word: [u8; 2] = [pair[0], pair[1]];
-                    u16::from_be_bytes(word)
-                })
-                .collect();
-
-            ctx.write_multiple_registers(tag.address, &value).await
-        }
-        shared::Command::Input => unimplemented!("An input register cannot be written."),
-    }
-    .map_err(|err| WriteError(err.to_string()))?;
-
-    ctx.disconnect()
-        .await
-        .map_err(|err| WriteError(err.to_string()))?;
+    let value_to_write = shared::parse_write(&value, &tag.swap);
+    shared::write(&mut ctx, &tag.command, tag.address, &value_to_write).await?;
 
     Ok(())
 }
